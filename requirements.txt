@@ -1,0 +1,11 @@
+numpy
+matplotlib
+tqdm
+pytorch
+torchvision
+pyro-ppl
+visdom
+scikit-learn
+pandas
+seaborn
+jsonpatch
