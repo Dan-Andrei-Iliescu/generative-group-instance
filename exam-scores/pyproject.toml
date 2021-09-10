@@ -6,6 +6,9 @@ authors = ["Dan-Andrei-Iliescu <iliescudanandrei@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.11"
+plotly = "^5.3.1"
+numpy = "^1.21.2"
+tqdm = "^4.62.2"
 
 [tool.poetry.dev-dependencies]
 
