@@ -1,5 +1,3 @@
-import random
-
 import torch
 import torch.nn as nn
 
@@ -10,81 +8,9 @@ import pyro.poutine as poutine
 import numpy as np
 import fire
 
-from utils.plots import plot_1D_rec, plot_1D_trans, plot_1D_latent
-from toy_data import generate_dataset
-
-
-# define the PyTorch module that parameterizes the
-# diagonal gaussian distribution q(u_i|{x}_i)
-class GroupEncoder(nn.Module):
-    def __init__(self, x_dim, u_dim, hidden_dim):
-        super().__init__()
-        # setup the three linear transformations used
-        self.fc1 = nn.Linear(x_dim, hidden_dim)
-        self.fc21 = nn.Linear(hidden_dim, u_dim)
-        self.fc22 = nn.Linear(hidden_dim, u_dim)
-        # setup the non-linearities
-        self.softplus = nn.Softplus()
-
-    def forward(self, x):
-        # define the forward computation on the data x
-        hidden = self.softplus(self.fc1(x))
-        # aggregate embeddings
-        hidden = torch.mean(hidden, dim=0, keepdim=True)
-        # then return a mean vector and a (positive) square root covariance
-        # each of size batch_size x z_dim
-        u_loc = self.fc21(hidden)
-        u_scale = self.softplus(self.fc22(hidden))
-        return u_loc, u_scale
-
-
-# define the PyTorch module that parameterizes the
-# diagonal gaussian distribution q(v_ij|x_ij, u_i)
-class InstEncoder(nn.Module):
-    def __init__(self, x_dim, u_dim, v_dim, hidden_dim):
-        super().__init__()
-        # setup the three linear transformations used
-        self.fc1 = nn.Linear(x_dim, hidden_dim)
-        self.fc21 = nn.Linear(hidden_dim+u_dim, v_dim)
-        self.fc22 = nn.Linear(hidden_dim+u_dim, v_dim)
-        # setup the non-linearities
-        self.softplus = nn.Softplus()
-
-    def forward(self, x, u):
-        # define the forward computation on the data x
-        hidden = self.softplus(self.fc1(x))
-        # concatenate u with embedding of x
-        u = torch.broadcast_to(u, [hidden.shape[0], u.shape[1]])
-        hidden = torch.cat([hidden, u], dim=-1)
-        # then return a mean vector and a (positive) square root covariance
-        # each of size batch_size x z_dim
-        v_loc = self.fc21(hidden)
-        v_scale = self.softplus(self.fc22(hidden))
-        return v_loc, v_scale
-
-
-# define the PyTorch module that parameterizes the
-# observation likelihood p(x|z)
-class Decoder(nn.Module):
-    def __init__(self, x_dim, u_dim, v_dim, hidden_dim):
-        super().__init__()
-        # setup the two linear transformations used
-        self.fc1 = nn.Linear(u_dim+v_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, x_dim)
-        # setup the non-linearities
-        self.softplus = nn.Softplus()
-
-    def forward(self, u, v):
-        # concatenate u with v
-        u = torch.broadcast_to(u, [v.shape[0], u.shape[1]])
-        z = torch.cat([u, v], dim=-1)
-        # define the forward computation on the latent z
-        # first compute the hidden units
-        hidden = self.softplus(self.fc1(z))
-        # return the parameter for the output Bernoulli
-        # each is of size batch_size x 784
-        x_loc = self.fc2(hidden)
-        return x_loc
+from networks import GroupEncoder, InstEncoder, Decoder
+from utils.helpers import prepare_data, trans_test, rec_test, latent_test
+from utils.toy_data import generate_dataset
 
 
 # define a PyTorch module for the VAE
@@ -207,49 +133,9 @@ class VAE(nn.Module):
         trans = self.decoder(u, v)
         return trans
 
-    # turn input numpy array into torch tensor
-    def prepare_data(self, x):
-        x = torch.Tensor(x)
-        # if on GPU put mini-batch into CUDA memory
-        if self.cuda:
-            x = x.cuda()
-        return x
-
-    # plot translation
-    def trans_test(self, test_data, epoch):
-        perm = test_data.copy()
-        random.seed(100)
-        random.shuffle(perm)
-        idx = 0
-        for x, y in zip(test_data, perm):
-            trans = self.translate(
-                self.prepare_data(x), self.prepare_data(y))\
-                .detach().cpu().numpy()
-            plot_1D_trans(
-                x, y, trans, "Hierarchical VAE", f"hvae/trans_{idx}")
-            idx += 1
-
-    # plot reconstruction
-    def rec_test(self, test_data, epoch):
-        rec_data = []
-        for x in test_data:
-            rec_data.append(self.reconstruct(
-                self.prepare_data(x)).detach().cpu().numpy())
-        plot_1D_rec(
-            test_data, rec_data, "Hierarchical VAE", f"hvae/rec_{epoch}")
-
-    # plot latent
-    def latent_test(self, test_data, epoch):
-        v_list = []
-        for x in test_data:
-            _, v = self.encode(self.prepare_data(x))
-            v_list.append(v.detach().cpu().numpy())
-        plot_1D_latent(
-            v_list, "Hierarchical VAE", f"hvae/latent_{epoch}")
-
 
 def main(
-        x_dim=1, num_epochs=10, test_freq=3, lr=1e-3, cuda=False,
+        x_dim=1, num_epochs=4, test_freq=2, lr=1e-3, cuda=False,
         num_train_groups=8000, num_test_groups=6):
     # clear param store
     pyro.clear_param_store()
@@ -270,7 +156,7 @@ def main(
         # by the data loader
         for x in train_data:
             # do ELBO gradient and accumulate loss
-            epoch_loss += vae.step(vae.prepare_data(x))
+            epoch_loss += vae.step(prepare_data(vae, x))
 
         # report training diagnostics
         normalizer_train = len(train_data)
@@ -280,18 +166,18 @@ def main(
 
         if epoch % test_freq == 0:
             # plot reconstruction
-            vae.rec_test(test_data, epoch)
+            rec_test(vae, test_data, epoch)
             # plot translation
-            vae.trans_test(test_data, epoch)
+            trans_test(vae, test_data, epoch)
             # plot latents
-            vae.latent_test(test_data, epoch)
+            latent_test(vae, test_data, epoch)
 
             # initialize loss accumulator
             test_error = 0.
             # compute the loss over the entire test set
             for x in test_data:
                 # compute ELBO estimate and accumulate loss
-                rec_x = vae.reconstruct(vae.prepare_data(x))\
+                rec_x = vae.reconstruct(prepare_data(vae, x))\
                     .detach().cpu().numpy()
                 test_error += np.sum((x - rec_x)**2)
 
@@ -300,8 +186,6 @@ def main(
             total_epoch_loss_test = test_error / normalizer_test
             print("[epoch %03d]  average test error: %.4f" %
                   (epoch, total_epoch_loss_test))
-
-    return vae
 
 
 if __name__ == '__main__':

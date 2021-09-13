@@ -1,5 +1,4 @@
 import numpy as np
-import plotly.graph_objects as go
 from tqdm import tqdm
 from utils.plots import plot_1D_rec, plot_1D_trans
 
