@@ -85,7 +85,6 @@ class Discriminator(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, 1)
         # setup the non-linearities
         self.softplus = nn.Softplus()
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         # define the forward computation on the data x
@@ -94,5 +93,5 @@ class Discriminator(nn.Module):
         hidden = torch.mean(hidden, dim=0, keepdim=True)
         # then return a mean vector and a (positive) square root covariance
         # each of size batch_size x z_dim
-        p = self.sigmoid(self.fc2(hidden))
-        return p
+        d = self.fc2(hidden)
+        return d

@@ -135,7 +135,7 @@ class VAE(nn.Module):
 
 
 def main(
-        x_dim=1, num_epochs=4, test_freq=2, lr=1e-3, cuda=False,
+        x_dim=1, num_epochs=9, test_freq=2, lr=1e-3, cuda=False,
         num_train_groups=8000, num_test_groups=6):
     # clear param store
     pyro.clear_param_store()
