@@ -5,16 +5,11 @@ import pyro
 import pyro.distributions as dist
 import pyro.poutine as poutine
 
-import numpy as np
-import fire
-
-from networks import GroupEncoder, InstEncoder, Decoder
-from utils.helpers import prepare_data, trans_test, rec_test, latent_test
-from utils.toy_data import generate_dataset
+from src.networks import GroupEncoder, InstEncoder, Decoder
 
 
 # define a PyTorch module for the VAE
-class VAE(nn.Module):
+class Model(nn.Module):
     def __init__(
             self, x_dim=1, u_dim=2, v_dim=1, h_dim=32, lr=1e-3, cuda=False):
         super().__init__()
@@ -132,61 +127,3 @@ class VAE(nn.Module):
         # decode p({x}|uy,{v})
         trans = self.decoder(u, v)
         return trans
-
-
-def main(
-        x_dim=1, num_epochs=9, test_freq=2, lr=1e-3, cuda=False,
-        num_train_groups=8000, num_test_groups=6):
-    # clear param store
-    pyro.clear_param_store()
-
-    # setup data lists
-    train_data, test_data = generate_dataset(
-        x_dim=x_dim, num_train_groups=num_train_groups,
-        num_test_groups=num_test_groups)
-
-    # setup the VAE
-    vae = VAE(x_dim=x_dim, cuda=cuda, lr=lr)
-
-    # training loop
-    for epoch in range(num_epochs):
-        # initialize loss accumulator
-        epoch_loss = 0.
-        # do a training epoch over each mini-batch x returned
-        # by the data loader
-        for x in train_data:
-            # do ELBO gradient and accumulate loss
-            epoch_loss += vae.step(prepare_data(vae, x))
-
-        # report training diagnostics
-        normalizer_train = len(train_data)
-        total_epoch_loss_train = epoch_loss / normalizer_train
-        print("[epoch %03d]  average training loss: %.4f" %
-              (epoch, total_epoch_loss_train))
-
-        if epoch % test_freq == 0:
-            # plot reconstruction
-            rec_test(vae, test_data, epoch)
-            # plot translation
-            trans_test(vae, test_data, epoch)
-            # plot latents
-            latent_test(vae, test_data, epoch)
-
-            # initialize loss accumulator
-            test_error = 0.
-            # compute the loss over the entire test set
-            for x in test_data:
-                # compute ELBO estimate and accumulate loss
-                rec_x = vae.reconstruct(prepare_data(vae, x))\
-                    .detach().cpu().numpy()
-                test_error += np.sum((x - rec_x)**2)
-
-            # report test diagnostics
-            normalizer_test = len(test_data)
-            total_epoch_loss_test = test_error / normalizer_test
-            print("[epoch %03d]  average test error: %.4f" %
-                  (epoch, total_epoch_loss_test))
-
-
-if __name__ == '__main__':
-    fire.Fire(main)

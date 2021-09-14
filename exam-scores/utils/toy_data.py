@@ -8,6 +8,7 @@ def generate_dataset(
     mean = 2
     scale = 1
 
+    # Training data
     np.random.seed(100)
     num_instances = min_num + np.random.poisson(lam=lam, size=num_train_groups)
     mean_vars = np.random.normal(
@@ -23,21 +24,44 @@ def generate_dataset(
         x = mean_vars[group_idx] + sdev_vars[group_idx] * inst_vars
         train_data.append(x)
 
+    # Testing x
     num_instances = min_num + np.random.poisson(lam=lam, size=num_test_groups)
     mean_vars = np.random.normal(
         loc=0, scale=mean, size=[num_train_groups, x_dim])
     sdev_vars = np.abs(np.random.normal(
         loc=0, scale=scale, size=[num_train_groups, x_dim]))**2
 
-    test_data = []
+    test_x = []
+    inst_vars = []
+    for group_idx in tqdm(range(num_test_groups)):
+        inst_vars.append(np.random.normal(
+            loc=0, scale=1, size=[num_instances[group_idx], x_dim]))
+        x = mean_vars[group_idx] + sdev_vars[group_idx] * inst_vars[group_idx]
+        test_x.append(x)
+
+    # Testing translation (shares inst vars with x)
+    mean_vars = np.random.normal(
+        loc=0, scale=mean, size=[num_train_groups, x_dim])
+    sdev_vars = np.abs(np.random.normal(
+        loc=0, scale=scale, size=[num_train_groups, x_dim]))**2
+
+    test_trans = []
+    for group_idx in tqdm(range(num_test_groups)):
+        x = mean_vars[group_idx] + sdev_vars[group_idx] * inst_vars[group_idx]
+        test_trans.append(x)
+
+    # Testing y (shares mean and sdev with trans)
+    num_instances = min_num + np.random.poisson(lam=lam, size=num_test_groups)
+
+    test_y = []
     for group_idx in tqdm(range(num_test_groups)):
         inst_vars = np.random.normal(
             loc=0, scale=1, size=[num_instances[group_idx], x_dim])
 
         x = mean_vars[group_idx] + sdev_vars[group_idx] * inst_vars
-        test_data.append(x)
+        test_y.append(x)
 
-    return train_data, test_data
+    return train_data, test_x, test_y, test_trans
 
 
 if __name__ == '__main__':

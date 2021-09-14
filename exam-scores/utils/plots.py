@@ -4,7 +4,7 @@ from plotly.subplots import make_subplots
 import numpy as np
 
 
-def plot_2D_groups(x, title, xaxis, yaxis, fname):
+def plot_2D_groups(x, title, xaxis, yaxis):
     fig = go.Figure()
     idx = 0
     for x_group in x:
@@ -14,6 +14,7 @@ def plot_2D_groups(x, title, xaxis, yaxis, fname):
         idx += 1
 
     fig.update_layout(
+        title=title,
         xaxis_title=xaxis,
         yaxis_title=yaxis,
         legend_title="Group",
@@ -23,7 +24,7 @@ def plot_2D_groups(x, title, xaxis, yaxis, fname):
     fig.show()
 
 
-def plot_1D_latent(x, title, fname):
+def plot_1D_latent(x, title):
     fig = go.Figure()
     colours = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A',
                '#19D3F3', '#FF6692', '#B6E880', '#FF97FF', '#FECB52']
@@ -45,6 +46,7 @@ def plot_1D_latent(x, title, fname):
     fig.update_xaxes(title_text="V Values")
     fig.update_yaxes(showticklabels=False)
     fig.update_layout(
+        title=title,
         legend_title="Groups",
         width=1000,
         height=1000,
@@ -53,7 +55,7 @@ def plot_1D_latent(x, title, fname):
     fig.show()
 
 
-def plot_1D_trans(x, y, trans, title, fname):
+def plot_1D_trans(x, y, trans, title):
     fig = go.Figure()
     colours = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A',
                '#19D3F3', '#FF6692', '#B6E880', '#FF97FF', '#FECB52']
@@ -85,6 +87,7 @@ def plot_1D_trans(x, y, trans, title, fname):
     fig.update_yaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)
     fig.update_layout(
+        title=title,
         legend_title="Groups",
         width=1000,
         height=1000,
@@ -93,7 +96,7 @@ def plot_1D_trans(x, y, trans, title, fname):
     fig.show()
 
 
-def plot_1D_rec(x, y, title, fname):
+def plot_1D_rec(x, y, title):
     fig = make_subplots(
         rows=2, cols=1, shared_xaxes=True,
         row_heights=[0.5, 0.5],
@@ -133,6 +136,7 @@ def plot_1D_rec(x, y, title, fname):
     fig.update_yaxes(showticklabels=False, row=1, col=1)
     fig.update_yaxes(showticklabels=False, row=2, col=1)
     fig.update_layout(
+        title=title,
         legend_title="Groups",
         width=1000,
         height=1000,
