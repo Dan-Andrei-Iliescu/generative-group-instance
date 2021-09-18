@@ -1,7 +1,5 @@
 import plotly.graph_objects as go
-import plotly.figure_factory as ff
 from plotly.subplots import make_subplots
-import numpy as np
 
 
 def plot_2D_groups(x, title, xaxis, yaxis):

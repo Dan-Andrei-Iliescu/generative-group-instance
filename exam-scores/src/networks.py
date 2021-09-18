@@ -9,20 +9,24 @@ class GroupEncoder(nn.Module):
         super().__init__()
         # setup the three linear transformations used
         self.fc1 = nn.Linear(x_dim, hidden_dim)
-        self.fc21 = nn.Linear(hidden_dim, u_dim)
-        self.fc22 = nn.Linear(hidden_dim, u_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc41 = nn.Linear(hidden_dim, u_dim)
+        self.fc42 = nn.Linear(hidden_dim, u_dim)
         # setup the non-linearities
         self.softplus = nn.Softplus()
 
     def forward(self, x):
         # define the forward computation on the data x
         hidden = self.softplus(self.fc1(x))
+        hidden = self.fc2(hidden)
         # aggregate embeddings
         hidden = torch.mean(hidden, dim=0, keepdim=True)
         # then return a mean vector and a (positive) square root covariance
         # each of size batch_size x z_dim
-        u_loc = self.fc21(hidden)
-        u_scale = self.softplus(self.fc22(hidden))
+        hidden = self.softplus(self.fc3(hidden))
+        u_loc = self.fc41(hidden)
+        u_scale = self.softplus(self.fc42(hidden))
         return u_loc, u_scale
 
 
@@ -33,21 +37,25 @@ class InstEncoder(nn.Module):
         super().__init__()
         # setup the three linear transformations used
         self.fc1 = nn.Linear(x_dim, hidden_dim)
-        self.fc21 = nn.Linear(hidden_dim+u_dim, v_dim)
-        self.fc22 = nn.Linear(hidden_dim+u_dim, v_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim+u_dim, hidden_dim+u_dim)
+        self.fc41 = nn.Linear(hidden_dim+u_dim, v_dim)
+        self.fc42 = nn.Linear(hidden_dim+u_dim, v_dim)
         # setup the non-linearities
         self.softplus = nn.Softplus()
 
     def forward(self, x, u):
         # define the forward computation on the data x
         hidden = self.softplus(self.fc1(x))
+        hidden = self.fc2(hidden)
         # concatenate u with embedding of x
         u = torch.broadcast_to(u, [hidden.shape[0], u.shape[1]])
         hidden = torch.cat([hidden, u], dim=-1)
         # then return a mean vector and a (positive) square root covariance
         # each of size batch_size x z_dim
-        v_loc = self.fc21(hidden)
-        v_scale = self.softplus(self.fc22(hidden))
+        hidden = self.softplus(self.fc3(hidden))
+        v_loc = self.fc41(hidden)
+        v_scale = self.softplus(self.fc42(hidden))
         return v_loc, v_scale
 
 
@@ -78,20 +86,22 @@ class Decoder(nn.Module):
 # define the PyTorch module that parameterizes the
 # diagonal gaussian distribution q(u_i|{x}_i)
 class Discriminator(nn.Module):
-    def __init__(self, x_dim, hidden_dim):
+    def __init__(self, x_dim, hidden_dim=128):
         super().__init__()
         # setup the three linear transformations used
         self.fc1 = nn.Linear(x_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, 1)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc4 = nn.Linear(hidden_dim, 1)
         # setup the non-linearities
         self.softplus = nn.Softplus()
 
     def forward(self, x):
         # define the forward computation on the data x
         hidden = self.softplus(self.fc1(x))
+        hidden = self.fc2(hidden)
         # aggregate embeddings
-        hidden = torch.mean(hidden, dim=0, keepdim=True)
-        # then return a mean vector and a (positive) square root covariance
-        # each of size batch_size x z_dim
-        d = self.fc2(hidden)
+        hidden = torch.sum(hidden, dim=0, keepdim=True)
+        hidden = self.softplus(self.fc3(hidden))
+        d = self.fc4(hidden)
         return d

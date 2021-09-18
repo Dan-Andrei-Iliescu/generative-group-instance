@@ -9,6 +9,8 @@ def generate_dataset(
     scale = 1
 
     # Training data
+    print("TRAINING DATA")
+
     np.random.seed(100)
     num_instances = min_num + np.random.poisson(lam=lam, size=num_train_groups)
     mean_vars = np.random.normal(
@@ -25,6 +27,8 @@ def generate_dataset(
         train_data.append(x)
 
     # Testing x
+    print("TESTING X")
+
     num_instances = min_num + np.random.poisson(lam=lam, size=num_test_groups)
     mean_vars = np.random.normal(
         loc=0, scale=mean, size=[num_train_groups, x_dim])
@@ -40,6 +44,8 @@ def generate_dataset(
         test_x.append(x)
 
     # Testing translation (shares inst vars with x)
+    print("TESTING TRANSLATION")
+
     mean_vars = np.random.normal(
         loc=0, scale=mean, size=[num_train_groups, x_dim])
     sdev_vars = np.abs(np.random.normal(
@@ -51,6 +57,8 @@ def generate_dataset(
         test_trans.append(x)
 
     # Testing y (shares mean and sdev with trans)
+    print("TESTING Y")
+
     num_instances = min_num + np.random.poisson(lam=lam, size=num_test_groups)
 
     test_y = []

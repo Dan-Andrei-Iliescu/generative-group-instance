@@ -15,6 +15,7 @@ class Model(nn.Module):
         super().__init__()
         self.u_dim = u_dim
         self.v_dim = v_dim
+        self.name = "ml_vae"
 
         # create the encoder and decoder networks
         self.group_enc = GroupEncoder(x_dim, u_dim, h_dim)
@@ -28,11 +29,11 @@ class Model(nn.Module):
             self.cuda()
 
         # setup the optimizer
-        model_params = list(self.group_enc.parameters()) + \
+        self.model_params = list(self.group_enc.parameters()) + \
             list(self.inst_enc.parameters()) + \
             list(self.decoder.parameters())
         self.optimizer = torch.optim.Adam(
-            model_params, lr=lr, betas=(0.5, 0.999))
+            self.model_params, lr=lr, betas=(0.5, 0.999))
 
     # define the generative model p(u) \prod_i p(v_i) p(x_i|u,v_i)
     def model(self, x):
