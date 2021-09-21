@@ -4,6 +4,7 @@ import json
 import os
 import numpy as np
 from tqdm import tqdm
+from joblib import Parallel, delayed
 
 from utils.helpers import prepare_data, trans_test, rec_test, latent_test, \
     rec_error, latent_error
@@ -15,7 +16,7 @@ from src.v_vs_n_gp import Model as v_vs_n_gp
 
 def main(
         model_name="ml_vae", x_dim=1, num_epochs=40, test_freq=1, lr=1e-4,
-        cuda=False, num_train_groups=100000, num_test_groups=32,
+        cuda=False, num_train_groups=10000, num_test_groups=32,
         result_dir="results/num_groups"):
     # Defensive
     assert(x_dim == 1)
@@ -53,9 +54,15 @@ def main(
         epoch_loss = 0.
         # do a training epoch over each mini-batch x returned
         # by the data loader
+        """
         for x in train_data:
             # do ELBO gradient and accumulate loss
             epoch_loss += model.step(prepare_data(model, x))
+        """
+
+        losses = Parallel(n_jobs=-1)(
+            [delayed(model.step)(prepare_data(model, x)) for x in train_data])
+        epoch_loss = sum(losses)
 
         # report training diagnostics
         normalizer_train = len(train_data)
