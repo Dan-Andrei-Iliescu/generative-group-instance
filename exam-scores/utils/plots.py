@@ -1,5 +1,6 @@
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import numpy as np
 
 
 def plot_2D_groups(x, title, xaxis, yaxis):
@@ -140,4 +141,64 @@ def plot_1D_rec(x, y, title):
         height=1000,
         barmode='stack'
     )
+    fig.show()
+
+
+def plot_results(test_dict):
+    fig = make_subplots(
+        rows=2, cols=2, shared_xaxes=True,
+        row_heights=[0.5, 0.5],
+        subplot_titles=["Reconstruction Error", "Translation Error",
+                        "Error of Mean of Group of Instance Variables",
+                        "Error of Variance of Group of Instance Variables"],
+        vertical_spacing=0.05)
+    colours = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A',
+               '#19D3F3', '#FF6692', '#B6E880', '#FF97FF', '#FECB52']
+
+    model_names = list(test_dict.keys())
+    for idx in range(len(model_names)):
+        model_name = model_names[idx]
+        plot_names = list(test_dict[model_name].keys())
+        rows = [1, 1, 2, 2]
+        cols = [1, 2, 1, 2]
+
+        is_showlegend = True
+        for plot_name, row, col in zip(plot_names, rows, cols):
+            epochs = list(test_dict[model_name][plot_name].keys())
+            rec_error_med = [
+                np.quantile(x, 0.5)
+                for x in test_dict[model_name][plot_name].values()]
+            rec_error_lo = [
+                np.quantile(x, 0.2)
+                for x in test_dict[model_name][plot_name].values()]
+            rec_error_hi = [
+                np.quantile(x, 0.8)
+                for x in test_dict[model_name][plot_name].values()]
+            fig.add_trace(go.Scatter(
+                x=epochs,
+                y=rec_error_med,
+                legendgroup=model_name, showlegend=is_showlegend,
+                mode="lines+markers",
+                marker=dict(color=colours[idx % len(colours)]),
+                name=model_name
+            ), row=row, col=col)
+            is_showlegend = False
+            fig.add_trace(go.Scatter(
+                x=epochs,
+                y=rec_error_lo,
+                legendgroup=model_name, showlegend=is_showlegend,
+                mode="lines",
+                marker=dict(color=colours[idx % len(colours)])
+            ), row=row, col=col)
+            fig.add_trace(go.Scatter(
+                x=epochs,
+                y=rec_error_hi,
+                legendgroup=model_name, showlegend=is_showlegend,
+                mode="lines",
+                marker=dict(color=colours[idx % len(colours)]),
+                fill='tonexty'
+            ), row=row, col=col)
+
+    fig.update_yaxes(type='log')
+    fig.update_xaxes(title_text="Epochs", row=2)
     fig.show()
