@@ -24,8 +24,8 @@ class Model(nn.Module):
 
         # calling cuda() here will put all the parameters of
         # the encoder and decoder networks into gpu memory
-        self.cuda = cuda
-        if self.cuda:
+        self.use_cuda = cuda
+        if self.use_cuda:
             self.cuda()
 
         # setup the optimizer
@@ -45,22 +45,21 @@ class Model(nn.Module):
         u_scale = torch.ones(1, self.u_dim, dtype=x.dtype, device=x.device)
         u = pyro.sample("group", dist.Normal(u_loc, u_scale).to_event(1))
 
-        with pyro.plate("data", x.shape[0]):
-            # sample p(v)
-            v_loc = torch.zeros(
-                x.shape[0], self.v_dim, dtype=x.dtype, device=x.device)
-            v_scale = torch.ones(
-                x.shape[0], self.v_dim, dtype=x.dtype, device=x.device)
-            v = pyro.sample("inst", dist.Normal(v_loc, v_scale).to_event(1))
+        # sample p(v)
+        v_loc = torch.zeros(
+            x.shape[0], x.shape[1], self.v_dim, dtype=x.dtype, device=x.device)
+        v_scale = torch.ones(
+            x.shape[0], x.shape[1], self.v_dim, dtype=x.dtype, device=x.device)
+        v = pyro.sample("inst", dist.Normal(v_loc, v_scale).to_event(1))
 
-            # sample p(x|u,v)
-            x_loc = self.decoder.forward(u, v)
-            x_scale = 0.1
-            pyro.sample(
-                "x", dist.Normal(x_loc, x_scale).to_event(1), obs=x)
+        # sample p(x|u,v)
+        x_loc = self.decoder.forward(u, v)
+        x_scale = 0.1
+        pyro.sample(
+            "x", dist.Normal(x_loc, x_scale).to_event(1), obs=x)
 
-            # return the loc so we can visualize it later
-            return x_loc
+        # return the loc so we can visualize it later
+        return x_loc
 
     # define the variational posterior q(u|{x}) \prod_i q(v_i|x_i,u)
     def guide(self, x):
@@ -72,13 +71,13 @@ class Model(nn.Module):
         u_loc, u_scale = self.group_enc.forward(x)
         u = pyro.sample("group", dist.Normal(u_loc, u_scale).to_event(1))
 
-        with pyro.plate("data", x.shape[0]):
-            # sample q(v|x,u)
-            v_loc, v_scale = self.inst_enc.forward(x, u)
-            v = pyro.sample("inst", dist.Normal(v_loc, v_scale).to_event(1))
+        # sample q(v|x,u)
+        v_loc, v_scale = self.inst_enc.forward(x, u)
+        v = pyro.sample("inst", dist.Normal(
+            v_loc, v_scale).to_event(1))
 
-            # return the latents
-            return u, v
+        # return the latents
+        return u, v
 
     # ELBO loss for hierarchical variational autoencoder
     def elbo_loss(self, x):

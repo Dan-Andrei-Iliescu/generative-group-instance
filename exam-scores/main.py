@@ -4,10 +4,10 @@ import json
 import os
 import numpy as np
 from tqdm import tqdm
-from joblib import Parallel, delayed
 
 from utils.helpers import prepare_data, trans_test, rec_test, latent_test, \
     rec_error, latent_error
+from utils.plots import plot_1D_trans, plot_1D_latent
 from utils.toy_data import generate_dataset
 from src.ml_vae import Model as ml_vae
 from src.v_vs_n import Model as v_vs_n
@@ -16,7 +16,7 @@ from src.v_vs_n_gp import Model as v_vs_n_gp
 
 def main(
         model_name="ml_vae", x_dim=1, num_epochs=40, test_freq=1, lr=1e-4,
-        cuda=False, num_train_groups=10000, num_test_groups=32,
+        cuda=False, num_train_batches=2048, batch_size=16, num_test_groups=32,
         result_dir="results/num_groups"):
     # Defensive
     assert(x_dim == 1)
@@ -26,8 +26,8 @@ def main(
 
     # setup data lists
     train_data, test_x, test_y, test_trans = generate_dataset(
-        x_dim=x_dim, num_train_groups=num_train_groups,
-        num_test_groups=num_test_groups)
+        x_dim=x_dim, num_train_batches=num_train_batches,
+        batch_size=batch_size, num_test_groups=num_test_groups)
 
     # dictionary of results to be stored for testing
     test_dict = {}
@@ -54,15 +54,9 @@ def main(
         epoch_loss = 0.
         # do a training epoch over each mini-batch x returned
         # by the data loader
-        """
         for x in train_data:
             # do ELBO gradient and accumulate loss
             epoch_loss += model.step(prepare_data(model, x))
-        """
-
-        losses = Parallel(n_jobs=-1)(
-            [delayed(model.step)(prepare_data(model, x)) for x in train_data])
-        epoch_loss = sum(losses)
 
         # report training diagnostics
         normalizer_train = len(train_data)
@@ -85,6 +79,8 @@ def main(
             print("[epoch %03d]  translation error: %.4f" %
                   (epoch, np.sum(trans_err)))
             test_dict['trans_error'][epoch] = trans_err
+            if epoch % 5 == 4:
+                plot_1D_trans(test_x, test_y, trans_batch, "Translation")
 
             # test latents
             v_batch = latent_test(model, test_x)
@@ -96,6 +92,8 @@ def main(
                   (epoch, np.sum(mean_err), np.sum(var_err)))
             test_dict['latent_mean'][epoch] = mean_err
             test_dict['latent_var'][epoch] = var_err
+            if epoch % 5 == 4:
+                plot_1D_latent(v_batch, "Latent")
 
             # Save json file of test results
             jsonString = json.dumps(test_dict)

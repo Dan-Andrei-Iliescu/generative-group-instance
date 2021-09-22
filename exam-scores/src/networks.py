@@ -21,7 +21,7 @@ class GroupEncoder(nn.Module):
         hidden = self.softplus(self.fc1(x))
         hidden = self.fc2(hidden)
         # aggregate embeddings
-        hidden = torch.mean(hidden, dim=0, keepdim=True)
+        hidden = torch.mean(hidden, dim=-2, keepdim=True)
         # then return a mean vector and a (positive) square root covariance
         # each of size batch_size x z_dim
         hidden = self.softplus(self.fc3(hidden))
@@ -49,7 +49,7 @@ class InstEncoder(nn.Module):
         hidden = self.softplus(self.fc1(x))
         hidden = self.fc2(hidden)
         # concatenate u with embedding of x
-        u = torch.broadcast_to(u, [hidden.shape[0], u.shape[1]])
+        u = torch.broadcast_to(u, [-1, hidden.shape[-2], u.shape[-1]])
         hidden = torch.cat([hidden, u], dim=-1)
         # then return a mean vector and a (positive) square root covariance
         # each of size batch_size x z_dim
@@ -72,7 +72,7 @@ class Decoder(nn.Module):
 
     def forward(self, u, v):
         # concatenate u with v
-        u = torch.broadcast_to(u, [v.shape[0], u.shape[1]])
+        u = torch.broadcast_to(u, [-1, v.shape[-2], u.shape[-1]])
         z = torch.cat([u, v], dim=-1)
         # define the forward computation on the latent z
         # first compute the hidden units
@@ -101,7 +101,7 @@ class Discriminator(nn.Module):
         hidden = self.softplus(self.fc1(x))
         hidden = self.fc2(hidden)
         # aggregate embeddings
-        hidden = torch.sum(hidden, dim=0, keepdim=True)
+        hidden = torch.sum(hidden, dim=-2, keepdim=True)
         hidden = self.softplus(self.fc3(hidden))
         d = self.fc4(hidden)
         return d

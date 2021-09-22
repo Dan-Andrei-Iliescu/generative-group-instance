@@ -4,10 +4,19 @@ import numpy as np
 
 # turn input numpy array into torch tensor
 def prepare_data(model, x):
+    if x.ndim == 2:
+        x = np.expand_dims(x, axis=0)
     x = torch.Tensor(x)
     # if on GPU put mini-batch into CUDA memory
-    if model.cuda:
+    if model.use_cuda:
         x = x.cuda()
+    return x
+
+
+def un_prepare_data(x):
+    x = x.detach().cpu().numpy()
+    if x.shape[0] == 1:
+        x = x[0]
     return x
 
 
@@ -32,17 +41,15 @@ def latent_error(v_list):
 def trans_test(model, test_x, test_y):
     trans = []
     for x, y in zip(test_x, test_y):
-        trans.append(model.translate(
-            prepare_data(model, x), prepare_data(model, y))
-            .detach().cpu().numpy())
+        trans.append(un_prepare_data(model.translate(
+            prepare_data(model, x), prepare_data(model, y))))
     return trans
 
 
 def rec_test(model, test_data):
     rec = []
     for x in test_data:
-        rec.append(model.reconstruct(
-            prepare_data(model, x)).detach().cpu().numpy())
+        rec.append(un_prepare_data(model.reconstruct(prepare_data(model, x))))
     return rec
 
 
