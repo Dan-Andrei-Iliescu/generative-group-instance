@@ -2,8 +2,8 @@ import pyro
 import fire
 import json
 import os
+import time
 import numpy as np
-from tqdm import tqdm
 
 from utils.helpers import prepare_data, trans_test, rec_test, latent_test, \
     rec_error, latent_error
@@ -15,11 +15,10 @@ from src.v_vs_n_gp import Model as v_vs_n_gp
 
 
 def train(
-        model_name="ml_vae", x_dim=1, num_epochs=40, test_freq=1, lr=1e-4,
+        model_name="ml_vae", num_epochs=80, test_freq=20, lr=1e-4,
         cuda=False, num_train_batches=256, batch_size=128, num_test_groups=32,
         result_path=None):
-    # Defensive
-    assert(x_dim == 1)
+    x_dim = 1
 
     # Path to save test results
     if result_path is None:
@@ -52,7 +51,8 @@ def train(
         raise NotImplementedError(f"Model type {model_name} does not exist")
 
     # training loop
-    for epoch in tqdm(range(num_epochs)):
+    start_time = time.time()
+    for epoch in range(num_epochs):
         # initialize loss accumulator
         epoch_loss = 0.
         # do a training epoch over each mini-batch x returned
@@ -61,49 +61,61 @@ def train(
             # do ELBO gradient and accumulate loss
             epoch_loss += model.step(prepare_data(model, x))
 
+        """
         # report training diagnostics
         normalizer_train = len(train_data)
         total_epoch_loss_train = epoch_loss / normalizer_train
         print("> [epoch %03d]  Training loss: %.4f" %
               (epoch, total_epoch_loss_train))
+        """
 
         # Testing
-        if epoch % test_freq == 0:
-            result_name = result_path + f" @ epoch {epoch}"
+        result_name = result_path + f" @ epoch {epoch+1}"
 
-            # test reconstruction
-            rec_batch = rec_test(model, test_x)
-            rec_err = rec_error(test_x, rec_batch)
-            print("[epoch %03d]  reconstruction error: %.4f" %
-                  (epoch, np.sum(rec_err)))
-            test_dict['rec_error'][epoch] = rec_err
+        # current time
+        curr_time = time.time()
+        elapsed = curr_time - start_time
+        per_epoch = elapsed / (epoch + 1)
+        print("> Training [%s / %d] took %.1fs, %.1fs/epoch" %
+              (result_name, num_epochs, elapsed, per_epoch))
 
-            # test translation
-            trans_batch = trans_test(model, test_x, test_y)
-            trans_err = rec_error(test_trans, trans_batch)
-            print("[epoch %03d]  translation error: %.4f" %
-                  (epoch, np.sum(trans_err)))
-            test_dict['trans_error'][epoch] = trans_err
-            if epoch % 10 == 9:
-                plot_1D_trans(test_x, test_y, trans_batch, result_name)
+        # test reconstruction
+        rec_batch = rec_test(model, test_x)
+        rec_err = rec_error(test_x, rec_batch)
+        print("[epoch %03d]  reconstruction error: %.4f" %
+              (epoch, np.sum(rec_err)))
+        test_dict['rec_error'][epoch] = rec_err
 
-            # test latents
-            v_batch = latent_test(model, test_x)
-            mean_err, var_err = latent_error(v_batch)
-            # Ridiculous but necessary for the purpose of serialization
-            mean_err = [float(x) for x in mean_err]
-            var_err = [float(x) for x in var_err]
-            print("[epoch %03d]  latent mean: %.4f, latent var: %.4f" %
-                  (epoch, np.sum(mean_err), np.sum(var_err)))
-            test_dict['latent_mean'][epoch] = mean_err
-            test_dict['latent_var'][epoch] = var_err
-            if epoch % 10 == 9:
-                plot_1D_latent(v_batch, result_name)
+        # test translation
+        trans_batch = trans_test(model, test_x, test_y)
+        trans_err = rec_error(test_trans, trans_batch)
+        print("[epoch %03d]  translation error: %.4f" %
+              (epoch, np.sum(trans_err)))
+        test_dict['trans_error'][epoch] = trans_err
 
-            # Save json file of test results
-            jsonString = json.dumps(test_dict)
-            with open(result_prog_path, "w") as jsonFile:
-                jsonFile.write(jsonString)
+        # Plot
+        if (epoch+1) % test_freq == 0:
+            plot_1D_trans(test_x, test_y, trans_batch, result_name)
+
+        # test latents
+        v_batch = latent_test(model, test_x)
+        mean_err, var_err = latent_error(v_batch)
+        # Ridiculous but necessary for the purpose of serialization
+        mean_err = [float(x) for x in mean_err]
+        var_err = [float(x) for x in var_err]
+        print("[epoch %03d]  latent mean: %.4f, latent var: %.4f" %
+              (epoch, np.sum(mean_err), np.sum(var_err)))
+        test_dict['latent_mean'][epoch] = mean_err
+        test_dict['latent_var'][epoch] = var_err
+
+        # Plot
+        if (epoch+1) % test_freq == 0:
+            plot_1D_latent(v_batch, result_name)
+
+        # Save json file of test results
+        jsonString = json.dumps(test_dict)
+        with open(result_prog_path, "w") as jsonFile:
+            jsonFile.write(jsonString)
 
     # Save json file of test results
     jsonString = json.dumps(test_dict)

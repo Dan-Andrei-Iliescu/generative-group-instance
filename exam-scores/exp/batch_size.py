@@ -1,6 +1,6 @@
 import os
 import fire
-from tqdm import tqdm
+import time
 from joblib import Parallel, delayed
 from src.train import train
 from utils.results import results
@@ -12,15 +12,16 @@ def batch_size_exp(result_dir="results", training=True):
     if training:
         model_name = "ml_vae"
         conds = [[64, 512],
-                 [256, 128],
-                 [1024, 32],
-                 [4096, 8]]
+                 [256, 128]]
 
+        start_time = time.time()
         Parallel(n_jobs=-1)(delayed(train)(
             num_train_batches=cond[0], batch_size=cond[1],
             result_path=os.path.join(
                 exp_dir, model_name+"_%04d_%04d" % (cond[0], cond[1]))
-        ) for cond in tqdm(conds))
+        ) for cond in conds)
+        elapsed = time.time() - start_time
+        print("\nExperiment batch size took %.1fs to train" % (elapsed))
 
     results(result_dir=exp_dir)
 
