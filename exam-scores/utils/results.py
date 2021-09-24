@@ -5,8 +5,8 @@ import os
 from utils.plots import plot_results
 
 
-def main(result_dir="results/num_groups"):
-    file_list = glob.glob(os.path.join(result_dir, "*"))
+def results(result_dir="results"):
+    file_list = sorted(glob.glob(os.path.join(result_dir, "*")))
     test_dict = {}
     for file_path in file_list:
         # Record model name
@@ -21,4 +21,4 @@ def main(result_dir="results/num_groups"):
 
 
 if __name__ == '__main__':
-    fire.Fire(main)
+    fire.Fire(results)

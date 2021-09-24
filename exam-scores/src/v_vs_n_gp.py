@@ -45,7 +45,7 @@ class Model(Super):
         gt = torch.normal(mean=torch.zeros_like(v), std=torch.ones_like(v))
         real_d = self.disc(gt)
 
-        return real_d - fake_d
+        return torch.mean(real_d - fake_d)
 
     # one training step
     def step(self, x):

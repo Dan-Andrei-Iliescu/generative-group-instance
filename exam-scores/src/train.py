@@ -14,12 +14,17 @@ from src.v_vs_n import Model as v_vs_n
 from src.v_vs_n_gp import Model as v_vs_n_gp
 
 
-def main(
+def train(
         model_name="ml_vae", x_dim=1, num_epochs=40, test_freq=1, lr=1e-4,
-        cuda=False, num_train_batches=2048, batch_size=16, num_test_groups=32,
-        result_dir="results/num_groups"):
+        cuda=False, num_train_batches=256, batch_size=128, num_test_groups=32,
+        result_path=None):
     # Defensive
     assert(x_dim == 1)
+
+    # Path to save test results
+    if result_path is None:
+        result_path = os.path.join("results", model_name)
+    result_prog_path = result_path + "_prog"
 
     # clear param store
     pyro.clear_param_store()
@@ -35,8 +40,6 @@ def main(
     test_dict['trans_error'] = {}
     test_dict['latent_mean'] = {}
     test_dict['latent_var'] = {}
-    result_path = os.path.join(result_dir, model_name)
-    result_prog_path = os.path.join(result_dir, model_name + "_prog")
 
     # setup the model
     if model_name == "ml_vae":
@@ -66,6 +69,8 @@ def main(
 
         # Testing
         if epoch % test_freq == 0:
+            result_name = result_path + f" @ epoch {epoch}"
+
             # test reconstruction
             rec_batch = rec_test(model, test_x)
             rec_err = rec_error(test_x, rec_batch)
@@ -79,8 +84,8 @@ def main(
             print("[epoch %03d]  translation error: %.4f" %
                   (epoch, np.sum(trans_err)))
             test_dict['trans_error'][epoch] = trans_err
-            if epoch % 5 == 4:
-                plot_1D_trans(test_x, test_y, trans_batch, "Translation")
+            if epoch % 10 == 9:
+                plot_1D_trans(test_x, test_y, trans_batch, result_name)
 
             # test latents
             v_batch = latent_test(model, test_x)
@@ -92,8 +97,8 @@ def main(
                   (epoch, np.sum(mean_err), np.sum(var_err)))
             test_dict['latent_mean'][epoch] = mean_err
             test_dict['latent_var'][epoch] = var_err
-            if epoch % 5 == 4:
-                plot_1D_latent(v_batch, "Latent")
+            if epoch % 10 == 9:
+                plot_1D_latent(v_batch, result_name)
 
             # Save json file of test results
             jsonString = json.dumps(test_dict)
@@ -105,6 +110,9 @@ def main(
     with open(result_path, "w") as jsonFile:
         jsonFile.write(jsonString)
 
+    # Remove progress file
+    os.remove(result_prog_path)
+
 
 if __name__ == '__main__':
-    fire.Fire(main)
+    fire.Fire(train)

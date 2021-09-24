@@ -57,5 +57,5 @@ def latent_test(model, test_data):
     v_list = []
     for x in test_data:
         _, v = model.encode(prepare_data(model, x))
-        v_list.append(v.detach().cpu().numpy())
+        v_list.append(un_prepare_data(v))
     return v_list
