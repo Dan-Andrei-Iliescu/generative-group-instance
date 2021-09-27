@@ -6,7 +6,7 @@ import time
 import numpy as np
 
 from utils.helpers import prepare_data, trans_test, rec_test, latent_test, \
-    rec_error, latent_error
+    rec_error, latent_error, elapsed_time
 from utils.plots import plot_1D_trans, plot_1D_latent
 from utils.toy_data import generate_dataset
 from src.ml_vae import Model as ml_vae
@@ -73,11 +73,10 @@ def train(
         result_name = result_path + f" @ epoch {epoch+1}"
 
         # current time
-        curr_time = time.time()
-        elapsed = curr_time - start_time
+        elapsed, mins, secs = elapsed_time(start_time)
         per_epoch = elapsed / (epoch + 1)
-        print("> Training [%s / %d] took %.1fs, %.1fs/epoch" %
-              (result_name, num_epochs, elapsed, per_epoch))
+        print("> Training [%s / %d] took %dm%ds, %.1fs/epoch" %
+              (result_name, num_epochs, mins, secs, per_epoch))
 
         # test reconstruction
         rec_batch = rec_test(model, test_x)

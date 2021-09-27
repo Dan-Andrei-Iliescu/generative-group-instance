@@ -13,28 +13,9 @@ def compute_colours():
                         f'rgba(202, 0, 87, {alpha})',
                         f'rgba(131, 56, 236, {alpha})',
                         f'rgba(58, 134, 255, {alpha})',
+                        f'rgba(70, 190, 190, {alpha})',
                         f'rgba(119, 191, 25, {alpha})'])
     return colours
-
-
-def plot_2D_groups(x, title, xaxis, yaxis):
-    fig = go.Figure()
-    idx = 0
-    for x_group in x:
-        fig.add_trace(go.Scatter(
-            x=x_group[:, 0], y=x_group[:, 1],
-            name=f"Group {idx + 1}", mode='markers'))
-        idx += 1
-
-    fig.update_layout(
-        title=title,
-        xaxis_title=xaxis,
-        yaxis_title=yaxis,
-        legend_title="Group",
-        width=1000,
-        height=1000
-    )
-    fig.show()
 
 
 def plot_1D_latent(x, title):
@@ -64,7 +45,7 @@ def plot_1D_latent(x, title):
         height=1000,
         barmode='stack'
     )
-    fig.show()
+    fig.show(renderer="firefox")
 
 
 def plot_1D_trans(x, y, trans, title):
@@ -122,7 +103,7 @@ def plot_1D_trans(x, y, trans, title):
         legend_title="Groups",
         barmode='stack'
     )
-    fig.show()
+    fig.show(renderer="firefox")
 
 
 def plot_1D_rec(x, y, title):
@@ -170,7 +151,7 @@ def plot_1D_rec(x, y, title):
         height=1000,
         barmode='stack'
     )
-    fig.show()
+    fig.show(renderer="firefox")
 
 
 def plot_results(test_dict):
@@ -228,4 +209,4 @@ def plot_results(test_dict):
 
     fig.update_yaxes(type='log')
     fig.update_xaxes(title_text="Epochs", row=2)
-    fig.show()
+    fig.show(renderer="firefox")

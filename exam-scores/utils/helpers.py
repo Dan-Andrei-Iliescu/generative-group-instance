@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import time
 
 
 # turn input numpy array into torch tensor
@@ -59,3 +60,11 @@ def latent_test(model, test_data):
         _, v = model.encode(prepare_data(model, x))
         v_list.append(un_prepare_data(v))
     return v_list
+
+
+def elapsed_time(start_time):
+    curr_time = time.time()
+    elapsed = curr_time - start_time
+    mins = elapsed / 60
+    secs = elapsed % 60
+    return elapsed, mins, secs
