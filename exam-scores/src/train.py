@@ -9,20 +9,18 @@ from utils.helpers import prepare_data, trans_test, rec_test, latent_test, \
     rec_error, latent_error, elapsed_time
 from utils.plots import plot_1D_trans, plot_1D_latent
 from utils.toy_data import generate_dataset
-from src.ml_vae import Model as ml_vae
-from src.v_vs_n import Model as v_vs_n
-from src.v_vs_n_gp import Model as v_vs_n_gp
+from src.model import Model
 
 
 def train(
-        model_name="ml_vae", num_epochs=80, test_freq=20, lr=1e-4,
-        cuda=False, num_train_batches=256, batch_size=128, num_test_groups=32,
-        result_path=None):
+        group_acc=None, inst_cond=True, reg=None,  cuda=False,
+        num_train_batches=256, batch_size=128, num_test_groups=32,
+        num_epochs=5, test_freq=20, lr=1e-4, result_path=None):
     x_dim = 1
 
     # Path to save test results
     if result_path is None:
-        result_path = os.path.join("results", model_name)
+        result_path = os.path.join("results", f"{group_acc}_{inst_cond}_{reg}")
     result_prog_path = result_path + "_prog"
 
     # clear param store
@@ -41,14 +39,9 @@ def train(
     test_dict['latent_var'] = {}
 
     # setup the model
-    if model_name == "ml_vae":
-        model = ml_vae(x_dim=x_dim, cuda=cuda, lr=lr)
-    elif model_name == "v_vs_n":
-        model = v_vs_n(x_dim=x_dim, cuda=cuda, lr=lr)
-    elif model_name == "v_vs_n_gp":
-        model = v_vs_n_gp(x_dim=x_dim, cuda=cuda, lr=lr)
-    else:
-        raise NotImplementedError(f"Model type {model_name} does not exist")
+    model = Model(
+        group_acc=group_acc, inst_cond=inst_cond, reg=reg, x_dim=x_dim,
+        lr=lr, cuda=cuda)
 
     # training loop
     start_time = time.time()
