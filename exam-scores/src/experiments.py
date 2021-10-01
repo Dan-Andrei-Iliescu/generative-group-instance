@@ -2,7 +2,6 @@ import os
 import fire
 import time
 import itertools
-import sys
 from joblib import Parallel, delayed
 from src.train import train
 from utils.results import results
@@ -15,22 +14,22 @@ def exp(result_dir="results", exp_name="model_type", training=True):
     if training:
         # All possible conditions
         group_acc = [None, "acc"]
-        group_acc_def = [None]
+        group_acc_def = ["acc"]
 
         inst_cond = [True, False]
-        inst_cond_def = [True]
+        inst_cond_def = [False]
 
-        reg = [None, "v_vs_n"]
+        reg = [None, "nemeth", "nemeth_group"]
         reg_def = [None]
 
-        num_train_batches = [256, 1024, 4096]
-        num_train_batches_def = [1024]
+        num_train_batches = [1024, 2048, 4096]
+        num_train_batches_def = [2048]
 
-        batch_size = [16, 64, 256]
-        batch_size_def = [256]
+        batch_size = [64, 128, 256]
+        batch_size_def = [128]
 
-        lr = [3, 4, 5, 6]
-        lr_def = [4]
+        lr = [2, 3, 4]
+        lr_def = [3]
 
         # Select relevant conditions based on the requested experiment
         serial_conds = [
@@ -40,6 +39,22 @@ def exp(result_dir="results", exp_name="model_type", training=True):
             serial_conds = [
                 group_acc, inst_cond, reg, num_train_batches_def,
                 batch_size_def, lr_def]
+        elif exp_name == "hyper_param":
+            serial_conds = [
+                group_acc_def, inst_cond_def, reg_def, num_train_batches,
+                batch_size, lr]
+        elif exp_name == "batch_size":
+            serial_conds = [
+                group_acc_def, inst_cond_def, reg_def, num_train_batches_def,
+                batch_size, lr_def]
+        elif exp_name == "num_train_batches":
+            serial_conds = [
+                group_acc_def, inst_cond_def, reg_def, num_train_batches,
+                batch_size_def, lr_def]
+        elif exp_name == "lr":
+            serial_conds = [
+                group_acc_def, inst_cond_def, reg_def, num_train_batches_def,
+                batch_size_def, lr]
 
         # Match every selected condition with every other condition
         cross_conds = list(itertools.product(*serial_conds))
@@ -53,7 +68,8 @@ def exp(result_dir="results", exp_name="model_type", training=True):
                 (cond[0], cond[1], cond[2], cond[3], cond[4], cond[5]))
         ) for cond in cross_conds)
         _, mins, secs = elapsed_time(start_time)
-        print("\nExperiment %s took %dm%ds to train" % (exp_name, mins, secs))
+        print("\nExperiment %s took %dm%ds to train\n\n" %
+              (exp_name, mins, secs))
 
     results(result_dir=exp_dir)
 

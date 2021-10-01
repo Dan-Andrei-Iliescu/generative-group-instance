@@ -24,7 +24,7 @@ def un_prepare_data(x):
 def rec_error(test_x, x_rec):
     error = []
     for x, rec in zip(test_x, x_rec):
-        error.append(np.mean((x - rec)**2))
+        error.append(np.mean(np.abs(x - rec)))
     return error
 
 
@@ -57,7 +57,7 @@ def rec_test(model, test_data):
 def latent_test(model, test_data):
     v_list = []
     for x in test_data:
-        _, v = model.guide(prepare_data(model, x))
+        _, v = model.inference(prepare_data(model, x))
         v_list.append(un_prepare_data(v))
     return v_list
 

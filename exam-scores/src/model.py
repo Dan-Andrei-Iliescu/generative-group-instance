@@ -1,11 +1,8 @@
 import torch
 import torch.nn as nn
 
-import pyro
-import pyro.distributions as dist
-
 from src.networks import Encoder, GroupEncoder, InstEncoder, Decoder
-from src.loss_funcs import elbo_func, v_vs_n_func, grad_penalty_func
+from src.loss_funcs import elbo_func, v_vs_n_func, nemeth_func
 
 
 # define a PyTorch module for the VAE
@@ -28,7 +25,7 @@ class Model(nn.Module):
 
         # create instance encoder network depending on whether
         # the instance encoder takes as input the group variable
-        if self.inst_cond is False:
+        if not self.inst_cond:
             self.inst_enc = Encoder(x_dim, z_dim=v_dim, h_dim=h_dim)
         else:
             self.inst_enc = InstEncoder(x_dim, u_dim, v_dim, h_dim)
@@ -40,10 +37,19 @@ class Model(nn.Module):
         if self.reg == "v_vs_n":
             self.adv = GroupEncoder(x_dim=v_dim, u_dim=1, h_dim=h_dim)
             self.adv_func = v_vs_n_func
-        """
-        elif self.reg == "vx_vs_v_x":
-            self.adv = Encoder(x_dim=x_dim+v_dim, z_dim=1, h_dim=h_dim)
-        """
+            self.adv_params = self.adv.parameters()
+        elif self.reg == "nemeth":
+            self.adv = InstEncoder(
+                x_dim=x_dim, u_dim=v_dim, v_dim=1, h_dim=h_dim)
+            self.adv_func = nemeth_func
+            self.adv_params = self.adv.parameters()
+        elif self.reg == "nemeth_group":
+            self.adv_u = GroupEncoder(x_dim, u_dim, h_dim)
+            self.adv_v = InstEncoder(x_dim, u_dim, v_dim=1, h_dim=h_dim)
+            self.adv = self.nemeth_group()
+            self.adv_func = nemeth_func
+            self.adv_params = list(self.adv_u.parameters()) + \
+                list(self.adv_v.parameters())
         self.adv_coeff = 10000
 
         # calling cuda() here will put all the parameters of the model on GPU
@@ -56,53 +62,35 @@ class Model(nn.Module):
             list(self.inst_enc.parameters()) + \
             list(self.decoder.parameters())
         self.optimizer = torch.optim.Adam(
-            self.model_params, lr=lr, betas=(0.1, 0.999),
-            weight_decay=1e-2, eps=0.1)
+            self.model_params, lr=lr, weight_decay=1e-8)
 
         # Optimizer for regularization
         if self.reg is not None:
             # setup the disc optimizer
             self.optim_adv = torch.optim.Adam(
-                self.adv.parameters(), lr=lr, betas=(0.1, 0.999),
-                weight_decay=1e-2, eps=0.1)
+                self.adv_params, lr=lr, weight_decay=1e-8)
 
-    # define the generative model p(u) \prod_i p(v_i) p(x_i|u,v_i)
-    def model(self, x):
-        # register PyTorch module `decoder` with Pyro
-        pyro.module("decoder", self.decoder)
+    # define the generative prior p(u) \prod_i p(v_i)
+    def prior(self, u, v, sample=True):
+        pu = torch.distributions.Normal(
+            torch.zeros_like(u), torch.ones_like(u))
+        u = pu.rsample()
+        pv = torch.distributions.Normal(
+            torch.zeros_like(v), torch.ones_like(v))
+        v = pv.rsample()
 
-        # sample p(u)
-        u_loc = torch.zeros(1, self.u_dim, dtype=x.dtype, device=x.device)
-        u_scale = torch.ones(1, self.u_dim, dtype=x.dtype, device=x.device)
-        u = pyro.sample("group", dist.Normal(u_loc, u_scale).to_event(1))
-
-        # sample p(v)
-        v_loc = torch.zeros(
-            x.shape[0], x.shape[1], self.v_dim, dtype=x.dtype, device=x.device)
-        v_scale = torch.ones(
-            x.shape[0], x.shape[1], self.v_dim, dtype=x.dtype, device=x.device)
-        v = pyro.sample("inst", dist.Normal(v_loc, v_scale).to_event(1))
-
-        # sample p(x|u,v)
-        x_loc = self.decoder.forward(u, v)
-        x_scale = 0.1
-        pyro.sample(
-            "x", dist.Normal(x_loc, x_scale).to_event(1), obs=x)
-
-        # return the loc so we can visualize it later
-        return x_loc
+        if sample:
+            return u, v
+        else:
+            return pu, pv
 
     # define the variational posterior q(u|{x}) \prod_i q(v_i|x_i,u)
-    def guide(self, x):
-        # register PyTorch module `encoder` with Pyro
-        pyro.module("group_encoder", self.group_enc)
-        pyro.module("instance_encoder", self.inst_enc)
-
+    def inference(self, x, sample=True):
         # sample q(u|{x})
         if self.group_acc == "acc":
-            u_loc_raw, u_scale_raw = self.group_enc.forward(x)
-            u_scale = torch.mean(u_scale_raw, dim=1, keepdim=True)
-            u_loc = torch.mean(u_loc_raw, dim=1, keepdim=True)
+            u_loc, u_scale = self.group_enc.forward(x)
+            u_scale = torch.mean(u_scale, dim=1, keepdim=True)
+            u_loc = torch.mean(u_loc, dim=1, keepdim=True)
         else:
             u_loc, u_scale = self.group_enc.forward(x)
         if torch.isnan(torch.sum(u_loc)):
@@ -113,7 +101,8 @@ class Model(nn.Module):
             print(
                 "!!! u_scale is NaN for " +
                 f"{self.group_acc}-{self.inst_cond}-{self.reg}")
-        u = pyro.sample("group", dist.Normal(u_loc, u_scale).to_event(1))
+        qu = torch.distributions.Normal(u_loc, u_scale)
+        u = qu.rsample()
 
         # sample q(v|x,u)
         if not self.inst_cond:
@@ -128,16 +117,25 @@ class Model(nn.Module):
             print(
                 "!!! v_scale is NaN for " +
                 f"{self.group_acc}-{self.inst_cond}-{self.reg}")
-        v = pyro.sample("inst", dist.Normal(
-            v_loc, v_scale).to_event(1))
+        qv = torch.distributions.Normal(v_loc, v_scale)
+        v = qv.rsample()
 
         # return the latents
-        return u, v
+        if sample:
+            return u, v
+        else:
+            return qu, qv
+
+    # define a helper function for computing the adversary prediction
+    def nemeth_group(self, x, v):
+        adv_u, _ = self.adv_u(x)
+        adv_v, _ = self.adv_v(x, adv_u)
+        return adv_v
 
     # define a helper function for reconstructing images
     def reconstruct(self, x):
         # sample q(u,{v}|{x})
-        u, v = self.guide(x)
+        u, v = self.inference(x)
         # decode p({x}|u,{v})
         x_loc = self.decoder(u, v)
         return x_loc
@@ -145,9 +143,9 @@ class Model(nn.Module):
     # define a helper function for translating images
     def translate(self, x, y):
         # sample q(u,{v}|{x})
-        _, v = self.guide(x)
+        _, v = self.inference(x)
         # sample q(uy|{y})
-        u, _ = self.guide(y)
+        u, _ = self.inference(y)
         # decode p({x}|uy,{v})
         trans = self.decoder(u, v)
         return trans
@@ -158,9 +156,7 @@ class Model(nn.Module):
         if self.reg is not None:
             self.optim_adv.zero_grad()
             loss = self.adv_coeff * self.adv_func(self, x)
-            loss += grad_penalty_func(self.adv.parameters(), loss)
             loss.backward()
-            nn.utils.clip_grad_value_(self.adv.parameters(), clip_value=1.)
             self.optim_adv.step()
             self.optim_adv.zero_grad()
 
@@ -169,11 +165,8 @@ class Model(nn.Module):
         loss = 0
         if self.reg is not None:
             loss -= self.adv_coeff * self.adv_func(self, x)
-            loss += grad_penalty_func(self.adv.parameters(), loss)
         loss += elbo_func(self, x)
-        loss += grad_penalty_func(self.model_params, loss)
         loss.backward()
-        nn.utils.clip_grad_value_(self.model_params, clip_value=1.)
         self.optimizer.step()
         self.optimizer.zero_grad()
 

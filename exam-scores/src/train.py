@@ -15,7 +15,7 @@ from src.model import Model
 def train(
         group_acc=None, inst_cond=True, reg=None,  cuda=False,
         num_train_batches=256, batch_size=128, num_test_groups=32,
-        num_epochs=5, test_freq=20, lr=1e-4, result_path=None):
+        num_epochs=80, test_freq=20, lr=1e-4, result_path=None):
     x_dim = 1
 
     # Path to save test results
