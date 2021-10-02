@@ -24,7 +24,7 @@ def un_prepare_data(x):
 def rec_error(test_x, x_rec):
     error = []
     for x, rec in zip(test_x, x_rec):
-        error.append(np.mean(np.abs(x - rec)))
+        error.append(np.mean((x - rec)**2))
     return error
 
 

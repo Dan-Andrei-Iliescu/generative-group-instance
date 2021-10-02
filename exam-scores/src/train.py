@@ -13,9 +13,9 @@ from src.model import Model
 
 
 def train(
-        group_acc=None, inst_cond=True, reg=None,  cuda=False,
-        num_train_batches=256, batch_size=128, num_test_groups=32,
-        num_epochs=80, test_freq=20, lr=1e-4, result_path=None):
+        group_acc=None, inst_cond=True, reg=None,  cuda=False, wd=1e-6,
+        num_train_batches=256, batch_size=64, num_test_groups=128,
+        num_epochs=40, test_freq=20, lr=1e-3, result_path=None):
     x_dim = 1
 
     # Path to save test results
@@ -41,7 +41,7 @@ def train(
     # setup the model
     model = Model(
         group_acc=group_acc, inst_cond=inst_cond, reg=reg, x_dim=x_dim,
-        lr=lr, cuda=cuda)
+        lr=lr, cuda=cuda, wd=wd)
 
     # training loop
     start_time = time.time()
@@ -109,13 +109,33 @@ def train(
         with open(result_prog_path, "w") as jsonFile:
             jsonFile.write(jsonString)
 
+    # Add this run to the other runs
+    if os.path.exists(result_path):
+        # Read test dict
+        fileObject = open(result_path, "r")
+        jsonContent = fileObject.read()
+        runs_dict = json.loads(jsonContent)
+    else:
+        runs_dict = {}
+    plot_names = list(test_dict.keys())
+    for plot_name in plot_names:
+        if plot_name not in runs_dict:
+            runs_dict[plot_name] = {}
+        for epoch in range(num_epochs):
+            if str(epoch) in runs_dict[plot_name]:
+                runs_dict[plot_name][str(epoch)].append(
+                    test_dict[plot_name][epoch])
+            else:
+                runs_dict[plot_name][epoch] = [test_dict[plot_name][epoch]]
+
     # Save json file of test results
-    jsonString = json.dumps(test_dict)
+    jsonString = json.dumps(runs_dict)
     with open(result_path, "w") as jsonFile:
         jsonFile.write(jsonString)
 
     # Remove progress file
-    os.remove(result_prog_path)
+    if os.path.exists(result_prog_path):
+        os.remove(result_prog_path)
 
 
 if __name__ == '__main__':

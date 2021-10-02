@@ -23,7 +23,7 @@ def plot_1D_latent(x, title):
     colours = compute_colours()[0]
 
     idx = 0
-    for x_group in x:
+    for x_group in x[:32]:
         idcs = [idx for _ in x_group]
         fig.add_trace(go.Box(
             x=x_group[:, 0], name=f"Group {idx + 1}",
@@ -49,7 +49,6 @@ def plot_1D_latent(x, title):
 
 
 def plot_1D_trans(x, y, trans, title):
-    num_rows = int(np.floor(np.sqrt(len(x))))
     num_rows = 3
     num_cols = 4
     fig = make_subplots(
@@ -154,6 +153,13 @@ def plot_1D_rec(x, y, title):
     fig.show(renderer="firefox")
 
 
+def moving_avg(a, n):
+    s = np.cumsum(a)
+    s[n:] = s[n:] - s[:-n]
+    s = s[n-1:] / n
+    return s
+
+
 def plot_results(test_dict):
     fig = make_subplots(
         rows=2, cols=2, shared_xaxes=True,
@@ -174,18 +180,26 @@ def plot_results(test_dict):
         is_showlegend = True
         for plot_name, row, col in zip(plot_names, rows, cols):
             epochs = list(test_dict[model_name][plot_name].keys())
-            rec_error_med = [
-                np.quantile(x, 0.5)
-                for x in test_dict[model_name][plot_name].values()]
-            rec_error_lo = [
-                np.quantile(x, 0.2)
-                for x in test_dict[model_name][plot_name].values()]
-            rec_error_hi = [
-                np.quantile(x, 0.8)
-                for x in test_dict[model_name][plot_name].values()]
+
+            error_med = []
+            error_lo = []
+            error_hi = []
+            for epoch in epochs:
+                runs = test_dict[model_name][plot_name][epoch]
+                print(len(runs))
+                error_med.append(np.mean(runs))
+                error_lo.append(np.quantile(
+                    [np.mean(run) for run in runs], 0.2))
+                error_hi.append(np.quantile(
+                    [np.mean(run) for run in runs], 0.8))
+            n = 1
+            # error_med = moving_avg(error_med, n)
+            # error_lo = moving_avg(error_lo, n)
+            # error_hi = moving_avg(error_hi, n)
+
             fig.add_trace(go.Scatter(
                 x=epochs,
-                y=rec_error_med,
+                y=error_med,
                 legendgroup=model_name, showlegend=is_showlegend,
                 mode="lines+markers",
                 marker=dict(color=colours[0][idx % len(colours[0])]),
@@ -194,13 +208,13 @@ def plot_results(test_dict):
             is_showlegend = False
             fig.add_trace(go.Scatter(
                 x=epochs,
-                y=rec_error_lo,
+                y=error_lo,
                 legendgroup=model_name, showlegend=is_showlegend,
                 mode="lines", line=dict(width=0)
             ), row=row, col=col)
             fig.add_trace(go.Scatter(
                 x=epochs,
-                y=rec_error_hi,
+                y=error_hi,
                 legendgroup=model_name, showlegend=is_showlegend,
                 mode="lines", line=dict(width=0),
                 fillcolor=colours[1][idx % len(colours[0])],

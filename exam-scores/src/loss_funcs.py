@@ -72,12 +72,17 @@ def nemeth_func(model, x):
     # Inst vars
     _, v = model.inference(x)
     v_same = v[:, group_order]
-    v_other = v[batch_order, group_order]
+    v_other = v[batch_order][:, group_order]
 
     # Adversarial loss
     d_same = model.adv(x, v_same)
     d_other = model.adv(x, v_other)
+    # print(torch.mean(v_same))
+    # print(torch.mean(v_other))
 
-    loss = torch.sum(d_same) - torch.log(torch.sum(torch.exp(d_other)))
+    loss = torch.log(torch.sum(torch.exp(d_other))) \
+        - torch.sum(d_same)
+    # loss = torch.sum(d_same) - torch.sum(d_other)
 
+    #print(f"Adv loss {loss}")
     return loss

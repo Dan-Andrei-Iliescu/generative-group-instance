@@ -103,8 +103,8 @@ class Decoder(nn.Module):
         u = torch.broadcast_to(u, [-1, v.shape[1], u.shape[2]])
         z = torch.cat([u, v], dim=2)
         hidden = self.relu(self.fc1(z))
-        # hidden = self.relu(self.fc2(hidden))
-        # hidden = self.relu(self.fc3(hidden))
+        hidden = self.relu(self.fc2(hidden))
+        hidden = self.relu(self.fc3(hidden))
         x_loc = self.fc4(hidden)
         return x_loc
 

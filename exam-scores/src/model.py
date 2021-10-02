@@ -8,8 +8,8 @@ from src.loss_funcs import elbo_func, v_vs_n_func, nemeth_func
 # define a PyTorch module for the VAE
 class Model(nn.Module):
     def __init__(
-            self, group_acc=None, inst_cond=True, reg=None,
-            x_dim=1, u_dim=2, v_dim=1, h_dim=32, lr=1e-4, cuda=False):
+            self, group_acc=None, inst_cond=True, reg=None, x_dim=1, u_dim=2,
+            v_dim=1, h_dim=32, lr=1e-4, cuda=False, wd=1e-6):
         super().__init__()
         self.group_acc = group_acc
         self.inst_cond = inst_cond
@@ -39,18 +39,19 @@ class Model(nn.Module):
             self.adv_func = v_vs_n_func
             self.adv_params = self.adv.parameters()
         elif self.reg == "nemeth":
-            self.adv = InstEncoder(
+            self.adv_v = InstEncoder(
                 x_dim=x_dim, u_dim=v_dim, v_dim=1, h_dim=h_dim)
+            self.adv = self.nemeth
             self.adv_func = nemeth_func
-            self.adv_params = self.adv.parameters()
+            self.adv_params = self.adv_v.parameters()
         elif self.reg == "nemeth_group":
             self.adv_u = GroupEncoder(x_dim, u_dim, h_dim)
             self.adv_v = InstEncoder(x_dim, u_dim, v_dim=1, h_dim=h_dim)
-            self.adv = self.nemeth_group()
+            self.adv = self.nemeth_group
             self.adv_func = nemeth_func
             self.adv_params = list(self.adv_u.parameters()) + \
                 list(self.adv_v.parameters())
-        self.adv_coeff = 10000
+        self.adv_coeff = 1e+5
 
         # calling cuda() here will put all the parameters of the model on GPU
         self.use_cuda = cuda
@@ -62,13 +63,13 @@ class Model(nn.Module):
             list(self.inst_enc.parameters()) + \
             list(self.decoder.parameters())
         self.optimizer = torch.optim.Adam(
-            self.model_params, lr=lr, weight_decay=1e-8)
+            self.model_params, lr=lr, weight_decay=wd)
 
         # Optimizer for regularization
         if self.reg is not None:
             # setup the disc optimizer
             self.optim_adv = torch.optim.Adam(
-                self.adv_params, lr=lr, weight_decay=1e-8)
+                self.adv_params, lr=lr, weight_decay=wd)
 
     # define the generative prior p(u) \prod_i p(v_i)
     def prior(self, u, v, sample=True):
@@ -87,12 +88,18 @@ class Model(nn.Module):
     # define the variational posterior q(u|{x}) \prod_i q(v_i|x_i,u)
     def inference(self, x, sample=True):
         # sample q(u|{x})
-        if self.group_acc == "acc":
+        if self.group_acc == "med":
             u_loc, u_scale = self.group_enc.forward(x)
             u_scale = torch.mean(u_scale, dim=1, keepdim=True)
             u_loc = torch.mean(u_loc, dim=1, keepdim=True)
+        elif self.group_acc == "mul":
+            u_loc_raw, u_scale_raw = self.group_enc.forward(x)
+            u_scale_raw = u_scale_raw + 1e-6
+            u_scale = 1. / torch.sum(1. / u_scale_raw, dim=1, keepdim=True)
+            u_loc = u_scale * torch.sum(u_loc_raw / u_scale_raw)
         else:
             u_loc, u_scale = self.group_enc.forward(x)
+        """
         if torch.isnan(torch.sum(u_loc)):
             print(
                 "!!! u_loc is NaN for " +
@@ -101,6 +108,7 @@ class Model(nn.Module):
             print(
                 "!!! u_scale is NaN for " +
                 f"{self.group_acc}-{self.inst_cond}-{self.reg}")
+        """
         qu = torch.distributions.Normal(u_loc, u_scale)
         u = qu.rsample()
 
@@ -109,6 +117,7 @@ class Model(nn.Module):
             v_loc, v_scale = self.inst_enc.forward(x)
         else:
             v_loc, v_scale = self.inst_enc.forward(x, u)
+        """
         if torch.isnan(torch.sum(v_loc)):
             print(
                 "!!! v_loc is NaN for " +
@@ -117,6 +126,7 @@ class Model(nn.Module):
             print(
                 "!!! v_scale is NaN for " +
                 f"{self.group_acc}-{self.inst_cond}-{self.reg}")
+        """
         qv = torch.distributions.Normal(v_loc, v_scale)
         v = qv.rsample()
 
@@ -127,9 +137,16 @@ class Model(nn.Module):
             return qu, qv
 
     # define a helper function for computing the adversary prediction
+    def nemeth(self, x, v):
+        adv_v, _ = self.adv_v(x, v)
+        adv_v = torch.tanh(adv_v)
+        return adv_v
+
+    # define a helper function for computing the adversary prediction
     def nemeth_group(self, x, v):
         adv_u, _ = self.adv_u(x)
-        adv_v, _ = self.adv_v(x, adv_u)
+        adv_v, _ = self.adv_v(v, adv_u)
+        adv_v = torch.tanh(adv_v)
         return adv_v
 
     # define a helper function for reconstructing images
