@@ -9,7 +9,7 @@ from src.loss_funcs import elbo_func, v_vs_n_func, nemeth_func
 class Model(nn.Module):
     def __init__(
             self, group_acc=None, inst_cond=True, reg=None, x_dim=1, u_dim=2,
-            v_dim=1, h_dim=32, lr=1e-4, cuda=False, wd=1e-6):
+            v_dim=1, h_dim=32, lr=1e-4, cuda=False, wd=1e-0):
         super().__init__()
         self.group_acc = group_acc
         self.inst_cond = inst_cond
@@ -51,7 +51,7 @@ class Model(nn.Module):
             self.adv_func = nemeth_func
             self.adv_params = list(self.adv_u.parameters()) + \
                 list(self.adv_v.parameters())
-        self.adv_coeff = 1e+5
+        self.adv_coeff = 1e+3
 
         # calling cuda() here will put all the parameters of the model on GPU
         self.use_cuda = cuda
@@ -94,12 +94,12 @@ class Model(nn.Module):
             u_loc = torch.mean(u_loc, dim=1, keepdim=True)
         elif self.group_acc == "mul":
             u_loc_raw, u_scale_raw = self.group_enc.forward(x)
-            u_scale_raw = u_scale_raw + 1e-6
+            u_scale_raw = u_scale_raw + 1e-8
             u_scale = 1. / torch.sum(1. / u_scale_raw, dim=1, keepdim=True)
-            u_loc = u_scale * torch.sum(u_loc_raw / u_scale_raw)
+            u_loc = u_scale * torch.sum(
+                u_loc_raw / u_scale_raw, dim=1, keepdim=True)
         else:
             u_loc, u_scale = self.group_enc.forward(x)
-        """
         if torch.isnan(torch.sum(u_loc)):
             print(
                 "!!! u_loc is NaN for " +
@@ -108,7 +108,6 @@ class Model(nn.Module):
             print(
                 "!!! u_scale is NaN for " +
                 f"{self.group_acc}-{self.inst_cond}-{self.reg}")
-        """
         qu = torch.distributions.Normal(u_loc, u_scale)
         u = qu.rsample()
 

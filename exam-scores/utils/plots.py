@@ -186,7 +186,6 @@ def plot_results(test_dict):
             error_hi = []
             for epoch in epochs:
                 runs = test_dict[model_name][plot_name][epoch]
-                print(len(runs))
                 error_med.append(np.mean(runs))
                 error_lo.append(np.quantile(
                     [np.mean(run) for run in runs], 0.2))

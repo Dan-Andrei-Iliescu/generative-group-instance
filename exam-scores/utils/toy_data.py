@@ -5,14 +5,14 @@ from utils.plots import plot_1D_rec, plot_1D_trans
 
 def generate_dataset(
         x_dim=2, num_train_batches=64, batch_size=32, num_test_groups=8,
-        min_num=8, lam=16):
+        min_num=8, lam=16, seed=100):
     mean = 2
     scale = 1
 
     # Training data
     print("TRAINING DATA")
 
-    np.random.seed(100)
+    np.random.seed(seed)
     num_instances = min_num + \
         np.random.poisson(lam=lam, size=num_train_batches)
     mean_vars = np.random.normal(

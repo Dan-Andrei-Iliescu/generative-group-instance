@@ -15,7 +15,7 @@ from src.model import Model
 def train(
         group_acc=None, inst_cond=True, reg=None,  cuda=False, wd=1e-6,
         num_train_batches=256, batch_size=64, num_test_groups=128,
-        num_epochs=40, test_freq=20, lr=1e-3, result_path=None):
+        num_epochs=40, test_freq=50, lr=1e-3, result_path=None, seed=100):
     x_dim = 1
 
     # Path to save test results
@@ -29,7 +29,7 @@ def train(
     # setup data lists
     train_data, test_x, test_y, test_trans = generate_dataset(
         x_dim=x_dim, num_train_batches=num_train_batches,
-        batch_size=batch_size, num_test_groups=num_test_groups)
+        batch_size=batch_size, num_test_groups=num_test_groups, seed=seed)
 
     # dictionary of results to be stored for testing
     test_dict = {}
