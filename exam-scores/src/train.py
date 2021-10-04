@@ -9,13 +9,14 @@ from utils.helpers import prepare_data, trans_test, rec_test, latent_test, \
     rec_error, latent_error, elapsed_time
 from utils.plots import plot_1D_trans, plot_1D_latent
 from utils.toy_data import generate_dataset
+# from utils.uniform_data import generate_dataset
 from src.model import Model
 
 
 def train(
         group_acc=None, inst_cond=True, reg=None,  cuda=False, wd=1e-6,
         num_train_batches=256, batch_size=64, num_test_groups=128,
-        num_epochs=40, test_freq=50, lr=1e-3, result_path=None, seed=100):
+        num_epochs=40, test_freq=20, lr=1e-3, result_path=None, seed=100):
     x_dim = 1
 
     # Path to save test results
@@ -87,7 +88,8 @@ def train(
 
         # Plot
         if (epoch+1) % test_freq == 0:
-            plot_1D_trans(test_x, test_y, trans_batch, result_name)
+            plot_1D_trans(test_x, test_y, trans_batch,
+                          result_name, result_path)
 
         # test latents
         v_batch = latent_test(model, test_x)
@@ -102,7 +104,7 @@ def train(
 
         # Plot
         if (epoch+1) % test_freq == 0:
-            plot_1D_latent(v_batch, result_name)
+            plot_1D_latent(v_batch, result_name, result_path)
 
         # Save json file of test results
         jsonString = json.dumps(test_dict)

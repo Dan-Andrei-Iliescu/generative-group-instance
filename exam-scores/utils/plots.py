@@ -1,6 +1,7 @@
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
+import os
 
 
 def compute_colours():
@@ -18,7 +19,7 @@ def compute_colours():
     return colours
 
 
-def plot_1D_latent(x, title):
+def plot_1D_latent(x, title, result_path):
     fig = go.Figure()
     colours = compute_colours()[0]
 
@@ -41,14 +42,14 @@ def plot_1D_latent(x, title):
     fig.update_layout(
         title=title,
         legend_title="Groups",
-        width=1000,
-        height=1000,
+        width=1200,
+        height=1200,
         barmode='stack'
     )
-    fig.show(renderer="firefox")
+    fig.write_image(result_path + "_latent.svg")
 
 
-def plot_1D_trans(x, y, trans, title):
+def plot_1D_trans(x, y, trans, title, result_path):
     num_rows = 3
     num_cols = 4
     fig = make_subplots(
@@ -99,10 +100,12 @@ def plot_1D_trans(x, y, trans, title):
     fig.update_yaxes(showticklabels=False)
     fig.update_layout(
         title=title,
+        width=1800,
+        height=1200,
         legend_title="Groups",
         barmode='stack'
     )
-    fig.show(renderer="firefox")
+    fig.write_image(result_path + "_trans.svg")
 
 
 def plot_1D_rec(x, y, title):
@@ -146,8 +149,8 @@ def plot_1D_rec(x, y, title):
     fig.update_layout(
         title=title,
         legend_title="Groups",
-        width=1000,
-        height=1000,
+        width=1200,
+        height=1200,
         barmode='stack'
     )
     fig.show(renderer="firefox")
@@ -160,7 +163,7 @@ def moving_avg(a, n):
     return s
 
 
-def plot_results(test_dict):
+def plot_results(test_dict, result_dir):
     fig = make_subplots(
         rows=2, cols=2, shared_xaxes=True,
         row_heights=[0.5, 0.5],
@@ -187,14 +190,14 @@ def plot_results(test_dict):
             for epoch in epochs:
                 runs = test_dict[model_name][plot_name][epoch]
                 error_med.append(np.mean(runs))
-                error_lo.append(np.quantile(
-                    [np.mean(run) for run in runs], 0.2))
-                error_hi.append(np.quantile(
-                    [np.mean(run) for run in runs], 0.8))
-            n = 1
-            # error_med = moving_avg(error_med, n)
-            # error_lo = moving_avg(error_lo, n)
-            # error_hi = moving_avg(error_hi, n)
+                error_lo.append(np.mean(np.sort(
+                    [np.mean(run) for run in runs])[:2]))
+                error_hi.append(np.mean(np.sort(
+                    [np.mean(run) for run in runs])[1:]))
+            n = 5
+            error_med = moving_avg(error_med, n)
+            error_lo = moving_avg(error_lo, n)
+            error_hi = moving_avg(error_hi, n)
 
             fig.add_trace(go.Scatter(
                 x=epochs,
@@ -222,4 +225,9 @@ def plot_results(test_dict):
 
     fig.update_yaxes(type='log')
     fig.update_xaxes(title_text="Epochs", row=2)
-    fig.show(renderer="firefox")
+    fig.update_layout(
+        legend_title="Conditions",
+        width=1800,
+        height=1200
+    )
+    fig.write_image(os.path.join(result_dir, "results.svg"))

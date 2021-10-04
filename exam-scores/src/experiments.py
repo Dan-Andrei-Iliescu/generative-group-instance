@@ -8,69 +8,46 @@ from utils.results import results
 from utils.helpers import elapsed_time
 
 
-def exp(result_dir="results", exp_name="final", training=True, runs=8):
+def exp(result_dir="results", exp_name=None, training=True):
     exp_dir = os.path.join(result_dir, exp_name)
 
     if training:
         # All possible conditions
-        group_acc = ["mul", "med"]
+        group_acc = [None, "mul", "med"]
         group_acc_def = ["mul"]
 
         inst_cond = [True, False]
         inst_cond_def = [False]
-        inst_cond_def = [True]
 
         reg = [None, "nemeth", "nemeth_group"]
         reg_def = [None]
 
-        num_train_batches = [1024, 2048, 4096]
+        num_train_batches = [256, 1024, 4096]
         num_train_batches_def = [1024]
 
-        batch_size = [64, 128, 256]
+        batch_size = [16, 64, 256]
         batch_size_def = [64]
 
         lr = [3, 4, 6]
         lr_def = [4]
 
-        seeds = [2, 8, 32, 128, 512]
+        seeds = [2, 8, 32]
 
         # Select relevant conditions based on the requested experiment
         serial_conds = [
             group_acc_def, inst_cond_def, reg_def, num_train_batches_def,
             batch_size_def, lr_def, seeds]
-        if exp_name == "model_name":
+        if exp_name == "model_type":
             serial_conds = [
                 group_acc, inst_cond, reg, num_train_batches_def,
                 batch_size_def, lr_def, seeds]
         elif exp_name == "hyper_param":
             serial_conds = [
                 group_acc_def, inst_cond_def, reg_def, num_train_batches,
-                batch_size, lr, seeds]
-        elif exp_name == "batch_size":
-            serial_conds = [
-                group_acc_def, inst_cond_def, reg_def, num_train_batches_def,
-                batch_size, lr_def, seeds]
-        elif exp_name == "num_train_batches":
-            serial_conds = [
-                group_acc_def, inst_cond_def, reg_def, num_train_batches,
-                batch_size_def, lr_def, seeds]
-        elif exp_name == "lr":
-            serial_conds = [
-                group_acc_def, inst_cond_def, reg_def, num_train_batches_def,
-                batch_size_def, lr, seeds]
-        elif exp_name == "cond":
-            serial_conds = [
-                group_acc_def, inst_cond, reg_def, num_train_batches_def,
-                batch_size_def, lr_def, seeds]
-        elif exp_name == "final":
-            serial_conds = [
-                group_acc_def, inst_cond, reg, num_train_batches_def,
-                batch_size_def, lr_def, seeds]
+                batch_size, lr, [2]]
 
         # Match every selected condition with every other condition
-        cross_conds = []
-        for _ in range(runs):
-            cross_conds += list(itertools.product(*serial_conds))
+        cross_conds = list(itertools.product(*serial_conds))
 
         start_time = time.time()
         Parallel(n_jobs=-1)(delayed(train)(
