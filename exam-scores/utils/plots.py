@@ -167,9 +167,9 @@ def plot_results(test_dict, result_dir):
     fig = make_subplots(
         rows=2, cols=2, shared_xaxes=True,
         row_heights=[0.5, 0.5],
-        subplot_titles=["Reconstruction Error", "Translation Error",
-                        "Error of Mean of Group of Instance Variables",
-                        "Error of Variance of Group of Instance Variables"],
+        subplot_titles=["a) Reconstruction Error", "b) Translation Error",
+                        "c) Error of Latent Mean (MSE)",
+                        "d) Error of Latent Standard Deviation (MSE)"],
         vertical_spacing=0.05)
     colours = compute_colours()
 
@@ -227,7 +227,7 @@ def plot_results(test_dict, result_dir):
     fig.update_xaxes(title_text="Epochs", row=2)
     fig.update_layout(
         legend_title="Conditions",
-        width=1800,
-        height=1200
+        width=1200,
+        height=800
     )
     fig.write_image(os.path.join(result_dir, "results.svg"))
