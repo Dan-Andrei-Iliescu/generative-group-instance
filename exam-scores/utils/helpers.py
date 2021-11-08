@@ -72,6 +72,13 @@ def elapsed_time(start_time):
     return elapsed, mins, secs
 
 
+def my_round(x):
+    try:
+        return np.around(x, decimals=3)
+    except:
+        return x
+
+
 def compute_results(test_dict, result_dir):
     df_dict = {}
     cond_names = list(test_dict.keys())
@@ -101,10 +108,6 @@ def compute_results(test_dict, result_dir):
             error_mean = np.mean(np.array(error_mean)[-n:])
             error_sdev = coeff * np.mean(np.array(error_sdev)[-n:])
 
-            test_dict[cond_name][test_name] = {}
-            test_dict[cond_name][test_name]['mean'] = error_mean
-            test_dict[cond_name][test_name]['sdev'] = error_sdev
-
             test_name_mean = test_name+"_mean"
             test_name_sdev = test_name+"_sdev"
             test_vals.append(test_name_mean)
@@ -121,8 +124,10 @@ def compute_results(test_dict, result_dir):
                 df_dict[test_name_sdev] = [error_sdev]
 
     df = pd.DataFrame(data=df_dict)
-    df.to_csv(os.path.join(result_dir, "table_results.csv"))
+    df.apply(my_round).to_csv(
+        os.path.join(result_dir, "table_results.csv"))
 
     for idx in range(len(conds)):
         agg_df = df.groupby([f"cond_{idx}"])[test_vals].mean()
-        agg_df.to_csv(os.path.join(result_dir, f"cond_{idx}.csv"))
+        agg_df.apply(my_round).to_csv(
+            os.path.join(result_dir, f"cond_{idx}.csv"))

@@ -1,0 +1,11 @@
+*.sty
+*.aux
+*.pdf
+*.bbl
+*.blg
+*.out
+*.eps
+*.gz
+*.fdb_latexmk
+*.fls
+*.bst
