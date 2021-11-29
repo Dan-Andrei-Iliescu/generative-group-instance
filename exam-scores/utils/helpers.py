@@ -74,7 +74,7 @@ def elapsed_time(start_time):
 
 def my_round(x):
     try:
-        return np.around(x, decimals=3)
+        return np.around(x, decimals=1)
     except:
         return x
 
@@ -105,8 +105,9 @@ def compute_results(test_dict, result_dir):
 
             n = 20
             coeff = 0.5
-            error_mean = np.mean(np.array(error_mean)[-n:])
-            error_sdev = coeff * np.mean(np.array(error_sdev)[-n:])
+            dec = 1e+2
+            error_mean = dec * np.mean(np.array(error_mean)[-n:])
+            error_sdev = dec * coeff * np.mean(np.array(error_sdev)[-n:])
 
             test_name_mean = test_name+"_mean"
             test_name_sdev = test_name+"_sdev"
