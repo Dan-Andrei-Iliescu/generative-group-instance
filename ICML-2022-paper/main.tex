@@ -94,14 +94,14 @@
 \printAffiliationsAndNotice{\icmlEqualContribution} % otherwise use the standard text.
 
 \begin{abstract}
-Group-instance disentanglement is the problem of learning separate representations for within-group and across-group variability. The current state-of-the-art methods for solving this problem are based on the Multi-Level Variational Autoencoder (ML-VAE). In this work, we create a synthetic dataset wherein the group and instance variables cannot be inferred separately from a single datapoint. We use this dataset to show that models from the ML-VAE family are limited in how they 1) accumulate evidence for computing the group variable, 2) define the variational distribution of the instance variable, and 3) use adversarial training to prevent the instance encoder from encoding group information. We overcome this failure case by modifying the encoder and loss function of the ML-VAE.
+Group-instance disentanglement is the problem of learning separate representations for within-group and across-group variability. The current state-of-the-art methods for solving this problem are based on the Group Variational Autoencoder (GVAE). In this work, we create a synthetic dataset wherein the group and instance variables cannot be inferred separately from a single datapoint. We use this dataset to show that models from the GVAE family are limited in how they 1) accumulate evidence for computing the group variable, 2) define the variational distribution of the instance variable, and 3) use adversarial training to prevent the instance encoder from encoding group information. We overcome this failure case by modifying the encoder and loss function of the GVAE.
 \end{abstract}
 
 \section{Introduction}
 
 Learning rich, interpretable representations with deep neural networks is one of the main challenges of current artificial intelligence research. Achieving such representations would enable us to perform complex and highly useful operations on high-dimensional data \citep{bengio2013representation}. Perhaps the first milestone that has yet to be reached in this research is learning representations which easily factorize along the lines of recognizable human concepts. This property is called ``the disentanglement of generative factors'', and is an accelerating field of inquiry \citep{tschannen2018recent}, with many major contributions coming from models based on the Variational Autoencoder \citep{kingma2013auto, rezende2014stochastic}.
 
-Recent work \citep{locatello2018challenging,van2019disentangled} has revealed limitations in the current methods caused by the inherent ambiguity of the disentanglement objective. They have pointed out the need for equipping models with inductive biases appropriate to their respective application. Segmenting the dataset into groups of observations is an example of such weak supervision.
+Recent work \citep{locatello2018challenging,van2019disentangled} has revealed limitations in the current methods caused by the inherent ambiguity of the disentanglement objective. They have pointed out the need for equipping models with inductive biases appropriate to their respective application. Segmenting the dataset into groups of o0bservations is an example of such weak supervision.
 
 \subsection{Our contribution}
 
@@ -147,20 +147,16 @@ We are given a dataset of observations split into groups $[x]^n = \{x_k^n\}_{k=1
 The task is to infer a group code $u^n \in \mathbb{R}^{d_U}$ for every group and an instance code $v^n_k \in \mathbb{R}^{d_V}$ for every datapoint.
 
 \paragraph{Generative Model}
-They create the random variables $\{[X]^n, U^n, [V]^n\}_{n=1}^{N}$ to model $\{[x]^n, u^n, [v]^n\}$ and assume that:
-- The latent variables are marginally independent and identically distributed $$\textrm{P} (\{u\}^N) = \prod_{n=1}^N \mathcal{N}(u^n; 0, \textrm{I}_{d_U})$$$$\textrm{P}(\{v\}_K^N) = \prod_{n=1}^N \prod_{k=1}^{K_n} \mathcal{N}(v_k^n; 0, \textrm{I}_{d_V})$$
-- The data variables are independent and identically distributed when conditoned on their respective group variables $$\textrm{P} (\{X\}_K^N ~|~ \{U\}^N) = \prod_{n=1}^N \prod_{k=1}^{K_n} \textrm{P}(X_k^n ~|~ U^n)$$
-
-\paragraph{Note} We write $\textrm{P}(x)$ to mean $\textrm{Pr}_{X^P}(x)$ and $\textrm{P}(X)$ to mean $\textrm{Pr}_{X^P}(.)$
+We assume that:
+\begin{itemize}
+    \item The latent variables are marginally independent and identically distributed $$p (\{u\}^N) = \prod_{n=1}^N \mathcal{N}(u^n; 0, \textrm{I}_{d_U})$$$$p(\{v\}_K^N) = \prod_{n=1}^N \prod_{k=1}^{K_n} \mathcal{N}(v_k^n; 0, \textrm{I}_{d_V})$$
+    \item The data variables are independent and identically distributed when conditoned on their respective group variables $$p (\{x\}_K^N ~|~ \{u\}^N) = \prod_{n=1}^N \prod_{k=1}^{K_n} p(x_k^n ~|~ u^n)$$
+\end{itemize}
 
 \paragraph{Variational Inference}
-They define the variational latent posterior to be $$\textrm{Q} (U, [V] ~|~ [X]) = \textrm{Q} (U ~|~ [X]) ~ \prod_{k=1}^K \textrm{Q} (V ~|~ X)$$ and maximize the Evidence Lower Bound per group $$\textrm{log} ~ \textrm{P} ([x]) \geq~ \textrm{E}_{\textrm{Q} (U, [V] | [x])} \sum_{k=1}^{K} \textrm{log} ~ \textrm{P}(x_k|u, v_k)$$ $$- \textrm{KL} [\textrm{Q}(U|[x]) ~||~ \textrm{P}(U)] - \sum_{k=1}^{K} \textrm{KL} [\textrm{Q}(V|x_k) ~||~ \textrm{P}(V)]$$
+They define the variational latent posterior to be $$q(u, [v] ~|~ [x]) = p (u ~|~ [x]) ~ \prod_{k=1}^K q (v ~|~ x)$$ and maximize the Evidence Lower Bound per group $$\textrm{log} ~ p ([x]) \geq~ \textrm{E}_{q (u, [v] | [x])} \sum_{k=1}^{K} \textrm{log} ~ p(x_k|u, v_k)$$ $$- \textrm{KL} [q(u|[x]) ~||~ p(u)] - \sum_{k=1}^{K} \textrm{KL} [q(v|x_k) ~||~ p(v)]$$
 
-\paragraph{Disentanglement} Disentanglement is guaranteed in the unregularized GVAE when the variational latent posterior matches the generative latent posterior.
-
-\paragraph{Regularization}
-
-\todo{Write section on regularization}
+\paragraph{Disentanglement} Disentanglement is guaranteed in the unregularized GVAE when the variational latent posterior matches the generative latent posterior. This is because the generative latent priors are marginally independent and maximally informative about the data (the goal of disentanglement).
 
 \section{Limitations of the GVAE}
 
@@ -170,23 +166,26 @@ In this section we prove mathematically that the current formulation of the GVAE
 
 We propose that a dataset has highly entangled group and instance factors when the maximum likelihood generative model has a non factorizable latent posterior $p(u, v | x) \neq p(u | x) p(v | x)$. This means that the group and instance variables are not independent when conditioned on the data.
 
-\subsection{Group Encoder}
+\subsection{Variational Latent Posterior}
 
-\subsection{Instance Encoder}
+\paragraph{Theorem} The variational latent posterior cannot match the generative latent posterior when the group and instance factors are highly entangled: $$\forall ~ p \textrm{ where } \exists ~ (u', v', x') ~\textrm {s.t.}~ p(u', v' | x') \neq p(u' | x') p(v' | x')$$ $$\implies \forall q \textrm{ then } \exists ~ (u, [x], [v]) ~ \textrm{s.t. } p(u, [v] | [x]) \neq q(u, [v] | [x])$$
 
-We prove that the variational latent posterior cannot match the generative latent posterior when the data is highly entangled.
+\paragraph{Proof} We break the proof down into multiple successive claims:
 
-\paragraph{Another statement} $$\forall ~ p,  ~ \forall q, ~ \exists ~ (u, [x], [v]), ~ p(u, [v] | [x]) \neq q(u, [v] | [x])$$
+\paragraph{Claim 1} $$\forall ~ p \textrm{ where } \exists ~ (x, u, v) ~\textrm {s.t.}~ p(u, v | x) \neq p(u | x) p(v | x)$$ $$\implies \exists ~ u' \neq u ~ \textrm{s.t.} ~ p(v | x, u) \neq p(v | x, u')$$
 
-- I want to prove that in certain cases, the variational instance posterior of the ML-VAE cannot be the same as the generative instance posterior. $$\exists ~ p, ~ \forall q, ~ \exists ~ (u, [x], [v]), ~ p(u, [v] | [x]) \neq q(u, [v] | [x])$$
-	- We first prove that $$\exists ~ x, u, v \textrm{ s.t. } p(v|x,u) \neq q(v|x) \implies \exists ~ u, [x], [v] \textrm{ s.t. } p(u, [v] | [x]) \neq q(u, [v] | [x])$$ when $$p(u, [v] | [x]) \neq 0, ~ q(u, [v] | [x]) \neq 0$$
-	- We then prove by contradiction that $$\exists ~ p, ~ \forall q, ~ \exists ~ (x, u, v), ~ p(v|x,u) \neq q(v|x)$$
-		- We assume that $$\forall p, ~ \exists q, ~\forall (x, u, v), ~ p(v | x, u) \neq q(v | x)$$ when $p(u, [v] | [x]) \neq 0, ~ q(u, [v] | [x]) \neq 0$.
-		- This must be true for the following case: $x, u^1 \neq u^2$ and $\forall v, ~ p(v | x, u) = \mathcal{N}(v; ~ x + u, 1)$
-		- Implies $\forall v, ~ p(v | x, u^1) \neq p(v | x, u^2)$
-		- Implies $\forall v, ~ q(v | x) = q(v | x)$ **Contradiction**
+\paragraph{Proof 1} We know by product rule that $$p(u, v | x) \neq p(u | x) p(v | x) \implies p(v | x, u) \neq p(v | x)$$ Assume (for proof by contradiction) $$\forall u', ~ p(v | x, u) = p(v | x, u')$$ That implies $$\sum_{u'} p(v|x,u') p(u'|x) = p(v|x,u) \sum_{u'}p(u'|x) = p(v|x,u)$$ However $$\sum_{u'} p(v|x,u') p(u'|x) = p(v | x)$$ That implies $p(v | x, u) = p(v | x) \Rightarrow\!\Leftarrow$
 
-\subsection{Regularization}
+\paragraph{Claim 2} $$\exists ~ (x, u \neq u', v) ~ \textrm{s.t.}~  p(v | x, u) \neq p(v | x, u')$$ $$\implies \forall q \textrm{ then } \exists ~ (x, u'', v) ~ \textrm{s.t. } p(v | x, u'') \neq q(v | x)$$
+
+\paragraph{Proof 2} Assume (for proof by contradiction) $$\exists ~ q \textrm{ s.t. } \forall (x, u'', v) ~ \textrm{s.t. } p(v | x, u'') = q(v | x)$$ That means $p(v | x, u) = q(v | x)$. That also means $p(v | x, u') = q(v | x)$. However, $p(v | x, u) \neq p(v | x, u')$. Therefore $q(v | x) \neq q(v | x) \Rightarrow\!\Leftarrow$
+
+\paragraph{Claim 3} $$\exists ~ (x, u, v) ~ \textrm{s.t. } p(v | x, u) \neq q(v | x)$$ $$\implies \exists ~ ([x], [v]) ~ \textrm{s.t. } p(u, [v] | [x]) \neq q(u, [v] | [x])$$ where $x_1 = x$ and $v_1 = v$.
+
+\paragraph{Proof 3} Assume (for proof by contradiction) $$\forall ([x], [v]), ~ p(u, [v] | [x]) = q(u, [v] | [x])$$ where $x_1 = x$ and $v_1 = v$. We know by simple probability rules that $$\sum_{[x]_{-1}, [v]_{-1}} p([x]_{-1}, [v]_{-1}) p(u, [v] | [x])$$ $$= \sum_{[x]_{-1}, [v]_{-1}} p([v]_{-1} | [x]_{-1}) p([x]_{-1}) p([v] | [x], u) p(u | [x])$$ $$= \sum_{[x]_{-1}, [v]_{-1}} p(u, [x]_{-1}| x_1) p(v_1 | x_1, u) \prod_{k \neq 1} p(v_k | [x]_{-1}) p(v_k | x_k, u)$$ $$= p(u | x_1) p(v_1 | x_1, u) \sum_{[x]_{-1}, [v]_{-1}} p([x]_{-1}| x_1, u) \prod_{k \neq 1} p(v_k | [x]_{-1}) p(v_k|x_k,u)$$ $$= p(u|x_1) p(v_1|x_1,u)$$ The same result applies to $$\sum_{[x]_{-1}, [v]_{-1}} q([x]_{-1},[v]_{-1}) q(u,[v]|[x]) = q(u|x_1) q(v_1|x_1)$$ Therefore $$p(u|x_1) p(v_1|x_1,u) = q(u|x_1) q(v_1|x_1)$$ 
+
+\todo{I don't know where to go from here, but I think the final result should be} $$p(v_1|x_1,u) = q(v_1|x_1) \Rightarrow\!\Leftarrow$$
+
 
 \section{A Dataset for Testing Group-Instance Disentanglement}
 
