@@ -110,6 +110,20 @@ class Decoder(nn.Module):
 
 
 # define the PyTorch module that parameterizes the
+# observation likelihood p(x|z)
+class DecoderGiven(nn.Module):
+    def __init__(self, x_dim, u_dim, v_dim, h_dim):
+        super().__init__()
+
+    def forward(self, u, v):
+        batch_size = u.shape[0]
+        u = torch.broadcast_to(u, [batch_size, v.shape[1], u.shape[2]])
+        x = u[:, :, 0] + u[:, :, 1]**2 * v[:, :, 0]
+        x = torch.unsqueeze(x, 2)
+        return x
+
+
+# define the PyTorch module that parameterizes the
 # diagonal gaussian distribution q(u_i|{x}_i)
 class Discriminator(nn.Module):
     def __init__(self, x_dim, h_dim=128):

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from src.networks import Encoder, GroupEncoder, InstEncoder, Decoder
+from src.networks import Encoder, GroupEncoder, InstEncoder, DecoderGiven
 from src.loss_funcs import elbo_func, v_vs_n_func, nemeth_func
 
 
@@ -31,7 +31,7 @@ class Model(nn.Module):
             self.inst_enc = InstEncoder(x_dim, u_dim, v_dim, h_dim)
 
         # create decoder network
-        self.decoder = Decoder(x_dim, u_dim, v_dim, h_dim)
+        self.decoder = DecoderGiven(x_dim, u_dim, v_dim, h_dim)
 
         # create adversary network depending on which regularization to use
         if self.reg == "v_vs_n":

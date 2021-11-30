@@ -13,53 +13,90 @@ def exp(result_dir="results", exp_name=None, training=True):
 
     if training:
         # All possible conditions
-        group_acc = [None, "mul", "med"]
-        group_acc_def = ["mul"]
+        group_acc_vals = [None, "mul", "med"]
+        group_acc_def = "mul"
 
-        inst_cond = [True, False]
-        inst_cond_def = [False]
+        inst_cond_vals = [True, False]
+        inst_cond_def = False
 
-        reg = [None, "nemeth", "nemeth_group"]
-        reg_def = [None]
+        reg_vals = [None, "nemeth", "nemeth_group"]
+        reg_def = None
 
-        num_train_batches = [256, 1024, 4096]
-        num_train_batches_def = [1024]
+        num_train_batches_vals = [256, 1024, 4096]
+        num_train_batches_def = 1024
 
-        batch_size = [16, 64, 256]
-        batch_size_def = [64]
+        batch_size_vals = [16, 64, 256]
+        batch_size_def = 64
 
-        lr = [3, 4, 6]
-        lr_def = [4]
+        lr_vals = [3, 4, 6]
+        lr_def = 4
 
-        seeds = [2, 8, 32]
+        seed_vals = [2, 8, 32]
 
         # Select relevant conditions based on the requested experiment
-        serial_conds = [
-            group_acc_def, inst_cond_def, reg_def, num_train_batches_def,
-            batch_size_def, lr_def, seeds]
-        if exp_name == "model_type":
-            serial_conds = [
-                group_acc, inst_cond, reg, num_train_batches_def,
-                batch_size_def, lr_def, seeds]
+        cond_dicts = []
+        if exp_name == "ablation":
+            for seed in seed_vals:
+                for group_acc in group_acc_vals:
+                    for inst_cond in inst_cond_vals:
+                        for reg in reg_vals:
+                            dict = {}
+                            dict['group_acc'] = group_acc
+                            dict['inst_cond'] = inst_cond
+                            dict['reg'] = reg
+                            dict['num_train_batches'] = num_train_batches_def
+                            dict['batch_size'] = batch_size_def
+                            dict['lr'] = lr_def
+                            dict['seed'] = seed
+                            cond_dicts.append(dict)
         elif exp_name == "hyper_param":
-            serial_conds = [
-                group_acc_def, inst_cond_def, reg_def, num_train_batches,
-                batch_size, lr, [2]]
+            for seed in seed_vals:
+                for num_train_batches in num_train_batches_vals:
+                    for batch_size in batch_size_vals:
+                        for lr in lr_vals:
+                            dict = {}
+                            dict['group_acc'] = group_acc_def
+                            dict['inst_cond'] = inst_cond_def
+                            dict['reg'] = reg_def
+                            dict['num_train_batches'] = num_train_batches
+                            dict['batch_size'] = batch_size
+                            dict['lr'] = lr
+                            dict['seed'] = seed
+                            cond_dicts.append(dict)
+        elif exp_name == "ours_vs_theirs":
+            group_accs = [None, "mul", "med", "med"]
+            inst_conds = [True, False, False, False]
+            regs = ["nemeth_group", None, None, "nemeth"]
 
-        # Match every selected condition with every other condition
-        cross_conds = list(itertools.product(*serial_conds))
+            for seed in seed_vals:
+                conds = zip(group_accs, inst_conds, regs)
+                for (group_acc, inst_cond, reg) in conds:
+                    dict = {}
+                    dict['group_acc'] = group_acc
+                    dict['inst_cond'] = inst_cond
+                    dict['reg'] = reg
+                    dict['num_train_batches'] = num_train_batches_def
+                    dict['batch_size'] = batch_size_def
+                    dict['lr'] = lr_def
+                    dict['seed'] = seed
+                    cond_dicts.append(dict)
 
+        # Run in parallel training for all conditions
         start_time = time.time()
         Parallel(n_jobs=-1)(delayed(train)(
-            group_acc=cond[0], inst_cond=cond[1], reg=cond[2],
-            num_train_batches=cond[3], batch_size=cond[4], lr=0.1**cond[5],
-            seed=cond[6], result_path=os.path.join(
-                exp_dir, "%s-%s-%s-%04d-%03d-%s" %
-                (cond[0], cond[1], cond[2], cond[3], cond[4], cond[5]))
-        ) for cond in cross_conds)
+            group_acc=dict['group_acc'], inst_cond=dict['inst_cond'],
+            reg=dict['reg'], num_train_batches=dict['num_train_batches'],
+            batch_size=dict['batch_size'], lr=0.1**dict['lr'],
+            seed=dict['seed'], result_path=os.path.join(
+                exp_dir, "%s-%s-%s-%04d-%03d-%s" % (
+                    dict['group_acc'], dict['inst_cond'], dict['reg'],
+                    dict['num_train_batches'], dict['batch_size'], dict['lr']))
+        ) for dict in cond_dicts)
         _, mins, secs = elapsed_time(start_time)
         print("\nExperiment %s took %dm%ds to train\n\n" %
               (exp_name, mins, secs))
+
+    # Process results
     results(result_dir=exp_dir)
 
 
