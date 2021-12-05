@@ -150,6 +150,8 @@ def plot_1D_trans(x, y, trans, title, result_path):
         title=title,
         width=FIG_SIZE,
         height=FIG_SIZE,
+        width=1200,
+        height=800,
         legend_title="Groups",
         barmode='stack'
     )
