@@ -4,8 +4,11 @@ import numpy as np
 import os
 
 NUM_GROUPS_PER_PLOT = 16
+<<<<<<< HEAD
 FIG_SIZE = 1200
 BIG_FIG_SIZE = 1600
+=======
+>>>>>>> 91cc42e7d9a7126986d3a13473ada9e569721888
 
 
 def compute_colours():
@@ -46,6 +49,7 @@ def plot_1D_data(x, title, result_path):
     fig.update_layout(
         title=title,
         legend_title="Groups",
+<<<<<<< HEAD
         width=FIG_SIZE,
         height=FIG_SIZE,
         barmode='stack'
@@ -57,6 +61,12 @@ def plot_1D_data(x, title, result_path):
         xanchor="right",
         x=1
     ))
+=======
+        width=800,
+        height=800,
+        barmode='stack'
+    )
+>>>>>>> 91cc42e7d9a7126986d3a13473ada9e569721888
     fig.write_image(result_path + ".svg")
 
 
@@ -83,8 +93,13 @@ def plot_1D_latent(x, title, result_path):
     fig.update_layout(
         title=title,
         legend_title="Groups",
+<<<<<<< HEAD
         width=FIG_SIZE,
         height=FIG_SIZE,
+=======
+        width=1000,
+        height=1000,
+>>>>>>> 91cc42e7d9a7126986d3a13473ada9e569721888
         barmode='stack'
     )
     fig.update_layout(legend=dict(
@@ -148,8 +163,13 @@ def plot_1D_trans(x, y, trans, title, result_path):
     fig.update_yaxes(showticklabels=False)
     fig.update_layout(
         title=title,
+<<<<<<< HEAD
         width=FIG_SIZE,
         height=FIG_SIZE,
+=======
+        width=1200,
+        height=800,
+>>>>>>> 91cc42e7d9a7126986d3a13473ada9e569721888
         legend_title="Groups",
         barmode='stack'
     )
