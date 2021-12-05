@@ -1,10 +1,10 @@
 import numpy as np
 from tqdm import tqdm
-from utils.plots import plot_1D_rec, plot_1D_trans
+from utils.plots import plot_1D_data
 
 
 def generate_dataset(
-        x_dim=2, num_train_batches=64, batch_size=32, num_test_groups=8,
+        x_dim=1, num_train_batches=64, batch_size=32, num_test_groups=8,
         min_num=8, lam=16, seed=100):
     mean = 2
     scale = 1
@@ -80,5 +80,4 @@ if __name__ == '__main__':
     print(train_data[0].shape)
     print(test_x[0].shape)
 
-    plot_1D_rec(test_x, test_y, "Test_rec")
-    plot_1D_trans(test_x[0], test_y[0], test_trans[0], "Test_trans")
+    plot_1D_data(test_x, "Data", "results/data")

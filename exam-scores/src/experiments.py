@@ -64,9 +64,9 @@ def exp(result_dir="results", exp_name=None, training=True):
                             dict['seed'] = seed
                             cond_dicts.append(dict)
         elif exp_name == "ours_vs_theirs":
-            group_accs = [None, "mul", "med", "med"]
-            inst_conds = [True, False, False, False]
-            regs = ["nemeth_group", None, None, "nemeth"]
+            group_accs = [None, None, "mul", "med", "med"]
+            inst_conds = [True, True, False, False, False]
+            regs = ["nemeth_group", None, None, None, "nemeth"]
 
             for seed in seed_vals:
                 conds = zip(group_accs, inst_conds, regs)

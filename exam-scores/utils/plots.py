@@ -3,6 +3,8 @@ from plotly.subplots import make_subplots
 import numpy as np
 import os
 
+NUM_GROUPS_PER_PLOT = 16
+
 
 def compute_colours():
     # colours
@@ -19,12 +21,42 @@ def compute_colours():
     return colours
 
 
+def plot_1D_data(x, title, result_path):
+    fig = go.Figure()
+    colours = compute_colours()[0]
+
+    idx = 0
+    for x_group in x[:NUM_GROUPS_PER_PLOT]:
+        idcs = [idx for _ in x_group]
+        fig.add_trace(go.Box(
+            x=x_group[:, 0], name=f"School {idx + 1}",
+            legendgroup=f"{idx}", showlegend=True,
+            marker=dict(color=colours[idx % len(colours)])))
+        fig.add_trace(go.Scatter(
+            x=x_group[:, 0], y=idcs,
+            legendgroup=f"{idx}", showlegend=False, mode="markers",
+            marker_line_color=colours[idx % len(colours)],
+            marker_symbol="line-ns", marker_line_width=2))
+        idx += 1
+
+    fig.update_xaxes(title_text="Exam Scores")
+    fig.update_yaxes(showticklabels=False, title_text="Schools")
+    fig.update_layout(
+        title=title,
+        legend_title="Groups",
+        width=800,
+        height=800,
+        barmode='stack'
+    )
+    fig.write_image(result_path + ".svg")
+
+
 def plot_1D_latent(x, title, result_path):
     fig = go.Figure()
     colours = compute_colours()[0]
 
     idx = 0
-    for x_group in x[:32]:
+    for x_group in x[:NUM_GROUPS_PER_PLOT]:
         idcs = [idx for _ in x_group]
         fig.add_trace(go.Box(
             x=x_group[:, 0], name=f"Group {idx + 1}",
@@ -42,16 +74,16 @@ def plot_1D_latent(x, title, result_path):
     fig.update_layout(
         title=title,
         legend_title="Groups",
-        width=1200,
-        height=1200,
+        width=1000,
+        height=1000,
         barmode='stack'
     )
     fig.write_image(result_path + "_latent.svg")
 
 
 def plot_1D_trans(x, y, trans, title, result_path):
-    num_rows = 3
-    num_cols = 4
+    num_rows = 2
+    num_cols = 2
     fig = make_subplots(
         rows=num_rows, cols=num_cols,
         vertical_spacing=0.01, horizontal_spacing=0.01,
@@ -100,8 +132,8 @@ def plot_1D_trans(x, y, trans, title, result_path):
     fig.update_yaxes(showticklabels=False)
     fig.update_layout(
         title=title,
-        width=1800,
-        height=1200,
+        width=1200,
+        height=800,
         legend_title="Groups",
         barmode='stack'
     )
