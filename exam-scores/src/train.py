@@ -1,4 +1,3 @@
-import pyro
 import fire
 import json
 import os
@@ -23,9 +22,6 @@ def train(
     if result_path is None:
         result_path = os.path.join("results", f"{group_acc}_{inst_cond}_{reg}")
     result_prog_path = result_path + "_prog"
-
-    # clear param store
-    pyro.clear_param_store()
 
     # setup data lists
     train_data, test_x, test_y, test_trans = generate_dataset(
