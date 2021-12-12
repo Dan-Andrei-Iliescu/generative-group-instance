@@ -3,6 +3,10 @@ from plotly.subplots import make_subplots
 import numpy as np
 import os
 
+NUM_GROUPS_PER_PLOT = 16
+FIG_SIZE = 1200
+BIG_FIG_SIZE = 1400
+
 
 def compute_colours():
     # colours
@@ -19,12 +23,49 @@ def compute_colours():
     return colours
 
 
+def plot_1D_data(x, title, result_path):
+    fig = go.Figure()
+    colours = compute_colours()[0]
+
+    idx = 0
+    for x_group in x[:NUM_GROUPS_PER_PLOT]:
+        idcs = [idx for _ in x_group]
+        fig.add_trace(go.Box(
+            x=x_group[:, 0], name=f"School {idx + 1}",
+            legendgroup=f"{idx}", showlegend=True,
+            marker=dict(color=colours[idx % len(colours)])))
+        fig.add_trace(go.Scatter(
+            x=x_group[:, 0], y=idcs,
+            legendgroup=f"{idx}", showlegend=False, mode="markers",
+            marker_line_color=colours[idx % len(colours)],
+            marker_symbol="line-ns", marker_line_width=2))
+        idx += 1
+
+    fig.update_xaxes(title_text="Exam Scores")
+    fig.update_yaxes(showticklabels=False, title_text="Schools")
+    fig.update_layout(
+        title=title,
+        legend_title="Groups",
+        width=FIG_SIZE,
+        height=FIG_SIZE,
+        barmode='stack'
+    )
+    fig.update_layout(legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=-0.1,
+        xanchor="right",
+        x=1
+    ))
+    fig.write_image(result_path + ".svg")
+
+
 def plot_1D_latent(x, title, result_path):
     fig = go.Figure()
     colours = compute_colours()[0]
 
     idx = 0
-    for x_group in x[:32]:
+    for x_group in x[:NUM_GROUPS_PER_PLOT]:
         idcs = [idx for _ in x_group]
         fig.add_trace(go.Box(
             x=x_group[:, 0], name=f"Group {idx + 1}",
@@ -42,16 +83,23 @@ def plot_1D_latent(x, title, result_path):
     fig.update_layout(
         title=title,
         legend_title="Groups",
-        width=1200,
-        height=1200,
+        width=FIG_SIZE,
+        height=FIG_SIZE,
         barmode='stack'
     )
+    fig.update_layout(legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=-0.1,
+        xanchor="right",
+        x=1
+    ))
     fig.write_image(result_path + "_latent.svg")
 
 
 def plot_1D_trans(x, y, trans, title, result_path):
-    num_rows = 3
-    num_cols = 4
+    num_rows = 2
+    num_cols = 2
     fig = make_subplots(
         rows=num_rows, cols=num_cols,
         vertical_spacing=0.01, horizontal_spacing=0.01,
@@ -100,11 +148,18 @@ def plot_1D_trans(x, y, trans, title, result_path):
     fig.update_yaxes(showticklabels=False)
     fig.update_layout(
         title=title,
-        width=1800,
-        height=1200,
+        width=FIG_SIZE,
+        height=FIG_SIZE,
         legend_title="Groups",
         barmode='stack'
     )
+    fig.update_layout(legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=-0.1,
+        xanchor="right",
+        x=1
+    ))
     fig.write_image(result_path + "_trans.svg")
 
 
@@ -159,8 +214,8 @@ def plot_1D_rec(x, y, title):
 def moving_avg(a, n):
     s = np.cumsum(a)
     s[n:] = s[n:] - s[:-n]
-    s = s[n-1:] / n
-    return s
+    a[n-1:] = s[n-1:] / n
+    return a
 
 
 def plot_results(test_dict, result_dir):
@@ -168,32 +223,33 @@ def plot_results(test_dict, result_dir):
         rows=2, cols=2, shared_xaxes=True,
         row_heights=[0.5, 0.5],
         subplot_titles=["a) Reconstruction Error", "b) Translation Error",
-                        "c) Error of Latent Mean (MSE)",
-                        "d) Error of Latent Standard Deviation (MSE)"],
+                        "c) Group Prediction Error",
+                        "d) Instance Prediction Error"],
         vertical_spacing=0.05)
     colours = compute_colours()
 
-    model_names = list(test_dict.keys())
-    for idx in range(len(model_names)):
-        model_name = model_names[idx]
-        plot_names = list(test_dict[model_name].keys())
+    cond_names = list(test_dict.keys())
+    for idx in range(len(cond_names)):
+        cond_name = cond_names[idx]
+        test_names = list(test_dict[cond_name].keys())
         rows = [1, 1, 2, 2]
         cols = [1, 2, 1, 2]
 
         is_showlegend = True
-        for plot_name, row, col in zip(plot_names, rows, cols):
-            epochs = list(test_dict[model_name][plot_name].keys())
+        for test_name, row, col in zip(test_names, rows, cols):
+            epochs = list(test_dict[cond_name][test_name].keys())
 
             error_med = []
             error_lo = []
             error_hi = []
             for epoch in epochs:
-                runs = test_dict[model_name][plot_name][epoch]
-                error_med.append(np.mean(runs))
-                error_lo.append(np.mean(np.sort(
-                    [np.mean(run) for run in runs])[:2]))
-                error_hi.append(np.mean(np.sort(
-                    [np.mean(run) for run in runs])[1:]))
+                runs = test_dict[cond_name][test_name][epoch]
+                run_means = np.array([np.mean(run) for run in runs])
+                error_quants = np.quantile(run_means, [0.25, 0.5, 0.75])
+
+                error_lo.append(error_quants[0])
+                error_med.append(error_quants[1])
+                error_hi.append(error_quants[2])
             n = 5
             error_med = moving_avg(error_med, n)
             error_lo = moving_avg(error_lo, n)
@@ -202,22 +258,22 @@ def plot_results(test_dict, result_dir):
             fig.add_trace(go.Scatter(
                 x=epochs,
                 y=error_med,
-                legendgroup=model_name, showlegend=is_showlegend,
+                legendgroup=cond_name, showlegend=is_showlegend,
                 mode="lines+markers",
                 marker=dict(color=colours[0][idx % len(colours[0])]),
-                name=model_name
+                name=cond_name
             ), row=row, col=col)
             is_showlegend = False
             fig.add_trace(go.Scatter(
                 x=epochs,
                 y=error_lo,
-                legendgroup=model_name, showlegend=is_showlegend,
+                legendgroup=cond_name, showlegend=is_showlegend,
                 mode="lines", line=dict(width=0)
             ), row=row, col=col)
             fig.add_trace(go.Scatter(
                 x=epochs,
                 y=error_hi,
-                legendgroup=model_name, showlegend=is_showlegend,
+                legendgroup=cond_name, showlegend=is_showlegend,
                 mode="lines", line=dict(width=0),
                 fillcolor=colours[1][idx % len(colours[0])],
                 fill='tonexty'
@@ -226,8 +282,15 @@ def plot_results(test_dict, result_dir):
     fig.update_yaxes(type='log')
     fig.update_xaxes(title_text="Epochs", row=2)
     fig.update_layout(
-        legend_title="Conditions",
-        width=1200,
-        height=800
+        legend_title="Models",
+        width=BIG_FIG_SIZE,
+        height=BIG_FIG_SIZE
     )
+    fig.update_layout(legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=-0.1,
+        xanchor="right",
+        x=1
+    ))
     fig.write_image(os.path.join(result_dir, "results.svg"))

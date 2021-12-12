@@ -1,3 +1,4 @@
+from warnings import resetwarnings
 import torch
 import time
 import os
@@ -5,14 +6,10 @@ import numpy as np
 import pandas as pd
 
 
-# turn input numpy array into torch tensor
-def prepare_data(model, x):
+def prepare_data(x):
     if x.ndim == 2:
         x = np.expand_dims(x, axis=0)
     x = torch.Tensor(x)
-    # if on GPU put mini-batch into CUDA memory
-    if model.use_cuda:
-        x = x.cuda()
     return x
 
 
@@ -30,38 +27,29 @@ def rec_error(test_x, x_rec):
     return error
 
 
-def latent_error(v_list):
-    mean_error = []
-    var_error = []
-    for v in v_list:
-        means = np.mean(v, axis=0, keepdims=True)
-        mean_error.append(np.mean(means**2))
-        vars = np.mean((v - means)**2, axis=0, keepdims=True)
-        var_error.append(np.mean((vars - 1)**2))
-    return mean_error, var_error
-
-
 def trans_test(model, test_x, test_y):
     trans = []
     for x, y in zip(test_x, test_y):
         trans.append(un_prepare_data(model.translate(
-            prepare_data(model, x), prepare_data(model, y))))
+            prepare_data(x), prepare_data(y))))
     return trans
 
 
 def rec_test(model, test_data):
     rec = []
     for x in test_data:
-        rec.append(un_prepare_data(model.reconstruct(prepare_data(model, x))))
+        rec.append(un_prepare_data(model.reconstruct(prepare_data(x))))
     return rec
 
 
-def latent_test(model, test_data):
-    v_list = []
-    for x in test_data:
-        _, v = model.inference(prepare_data(model, x))
-        v_list.append(un_prepare_data(v))
-    return v_list
+def latent_test(model, u_net, v_net, test_x):
+    u_pred = []
+    v_pred = []
+    for x in test_x:
+        u_inf, v_inf = model.inference(prepare_data(x))
+        u_pred.append(un_prepare_data(u_net(u_inf)))
+        v_pred.append(un_prepare_data(v_net(v_inf)))
+    return u_pred, v_pred
 
 
 def elapsed_time(start_time):
@@ -72,7 +60,21 @@ def elapsed_time(start_time):
     return elapsed, mins, secs
 
 
-def compute_results(test_dict, result_dir):
+def my_round(x):
+    try:
+        return np.around(x, decimals=1)
+    except:
+        return x
+
+
+def moving_avg(a, n):
+    s = np.cumsum(a)
+    s[n:] = s[n:] - s[:-n]
+    a[n-1:] = s[n-1:] / n
+    return a
+
+
+def save_results(test_dict, result_dir):
     df_dict = {}
     cond_names = list(test_dict.keys())
     for cond_name in cond_names:
@@ -97,13 +99,9 @@ def compute_results(test_dict, result_dir):
                     (np.mean(run_means) - run_means)**2)))
 
             n = 20
-            coeff = 0.5
-            error_mean = np.mean(np.array(error_mean)[-n:])
-            error_sdev = coeff * np.mean(np.array(error_sdev)[-n:])
-
-            test_dict[cond_name][test_name] = {}
-            test_dict[cond_name][test_name]['mean'] = error_mean
-            test_dict[cond_name][test_name]['sdev'] = error_sdev
+            dec = 1e+2
+            error_mean = dec * np.mean(np.array(error_mean)[-n:])
+            error_sdev = dec * np.mean(np.array(error_sdev)[-n:])
 
             test_name_mean = test_name+"_mean"
             test_name_sdev = test_name+"_sdev"
@@ -121,8 +119,10 @@ def compute_results(test_dict, result_dir):
                 df_dict[test_name_sdev] = [error_sdev]
 
     df = pd.DataFrame(data=df_dict)
-    df.to_csv(os.path.join(result_dir, "table_results.csv"))
+    df.apply(my_round).to_csv(
+        os.path.join(result_dir, "table_results.csv"))
 
     for idx in range(len(conds)):
         agg_df = df.groupby([f"cond_{idx}"])[test_vals].mean()
-        agg_df.to_csv(os.path.join(result_dir, f"cond_{idx}.csv"))
+        agg_df.apply(my_round).to_csv(
+            os.path.join(result_dir, f"cond_{idx}.csv"))
