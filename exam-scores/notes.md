@@ -1,6 +1,8 @@
 ### 2021-12-12
 
-I have also changed the generation procedure. I think a problem with the disentanglement was that, in some cases, the variance of the observations within a group was too small because the variance was a squared normal. I have added 1 to the variance term in the group variable, and disentanglement seems to have improved vastly.
+I have changed the generation procedure. I think a problem with the disentanglement was that, in some cases, the variance of the observations within a group was too small because the variance was a squared normal. I have added 1 to the variance term in the group variable, and disentanglement seems to have improved vastly.
+
+I have implemented a "subtractive" ablation experiment, whereby each component is individually removed from my proposed model to see the relative loss of performance. I prefer this because in the additive ablation setting, you have to chose a benchmark model ,which is difficult because I am comparing with multiple models in the literature.
 
 ### 2021-12-09
 

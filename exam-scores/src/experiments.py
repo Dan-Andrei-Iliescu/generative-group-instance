@@ -19,7 +19,7 @@ def exp(result_dir="results", exp_name=None, training=True):
         inst_cond_vals = [True, False]
         inst_cond_def = False
 
-        reg_vals = [None, "nemeth", "nemeth_group"]
+        reg_vals = [None, "nemeth", "ours"]
         reg_def = None
 
         num_train_batches_vals = [256, 1024, 4096]
@@ -32,6 +32,7 @@ def exp(result_dir="results", exp_name=None, training=True):
         lr_def = 4
 
         seed_vals = [2, 8, 32, 128, 512]
+        seed_vals = [2, 8, 32]
 
         # Select relevant conditions based on the requested experiment
         cond_dicts = []
@@ -66,7 +67,26 @@ def exp(result_dir="results", exp_name=None, training=True):
         elif exp_name == "ours_vs_theirs":
             group_accs = [None, None, "mul", "med", "med"]
             inst_conds = [True, True, False, False, False]
-            regs = ["nemeth_group", None, None, None, "nemeth"]
+            regs = ["ours", None, None, None, "nemeth"]
+
+            for seed in seed_vals:
+                conds = zip(group_accs, inst_conds, regs)
+                for (group_acc, inst_cond, reg) in conds:
+                    dict = {}
+                    dict['group_acc'] = group_acc
+                    dict['inst_cond'] = inst_cond
+                    dict['reg'] = reg
+                    dict['num_train_batches'] = num_train_batches_def
+                    dict['batch_size'] = batch_size_def
+                    dict['lr'] = lr_def
+                    dict['seed'] = seed
+                    cond_dicts.append(dict)
+        elif exp_name == "sub_ablation":
+            group_accs = [None, "mul", "med", None, None, None]
+            inst_conds = [True, True, True, False, True, True]
+            regs = [
+                "ours", "ours", "ours", "ours",
+                None, "nemeth"]
 
             for seed in seed_vals:
                 conds = zip(group_accs, inst_conds, regs)

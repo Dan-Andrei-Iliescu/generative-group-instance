@@ -42,10 +42,10 @@ class Model(nn.Module):
             self.adv = self.nemeth
             self.adv_func = nemeth_func
             self.adv_params = self.adv_v.parameters()
-        elif self.reg == "nemeth_group":
+        elif self.reg == "ours":
             self.adv_u = GroupEncoder(x_dim, u_dim, h_dim)
             self.adv_v = InstEncoder(x_dim, u_dim, v_dim=1, h_dim=h_dim)
-            self.adv = self.nemeth_group
+            self.adv = self.ours
             self.adv_func = nemeth_func
             self.adv_params = list(self.adv_u.parameters()) + \
                 list(self.adv_v.parameters())
@@ -135,7 +135,7 @@ class Model(nn.Module):
         return adv_v
 
     # define a helper function for computing the adversary prediction
-    def nemeth_group(self, x, v):
+    def ours(self, x, v):
         adv_u, _ = self.adv_u(x)
         adv_v, _ = self.adv_v(v, adv_u)
         adv_v = torch.tanh(adv_v)
