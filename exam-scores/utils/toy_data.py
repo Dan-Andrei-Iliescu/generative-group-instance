@@ -1,83 +1,91 @@
+import time
 import numpy as np
-from tqdm import tqdm
-from utils.plots import plot_1D_data
+from utils.plots import plot_1D_data, plot_1D_trans
+from utils.helpers import elapsed_time
+
+
+def gt_factors(num_batches, batch_size, rng):
+    lam = 16
+    min_num = 8
+
+    num_instances = min_num + \
+        rng.poisson(lam=lam, size=num_batches)
+    u = rng.normal(
+        loc=0, scale=1, size=[num_batches, batch_size, 1, 2])
+    v = []
+    for batch_idx in range(num_batches):
+        v.append(rng.normal(
+            loc=0, scale=1,
+            size=[batch_size, num_instances[batch_idx], 1]))
+
+    return u, v
+
+
+def generator(u, v):
+    num_batches = len(v)
+    x = []
+    for batch_idx in range(num_batches):
+        x.append(
+            2 * u[batch_idx, :, :, :1]
+            + (u[batch_idx, :, :, 1:]**2 + 1) * v[batch_idx])
+    return x
 
 
 def generate_dataset(
-        x_dim=1, num_train_batches=64, batch_size=32, num_test_groups=8,
-        min_num=8, lam=16, seed=100):
-    mean = 2
-    scale = 1
+        num_train_batches=64, num_test_batches=8, batch_size=32, seed=100):
+
+    # Random number generator for this run
+    rng = np.random.default_rng(seed)
 
     # Training data
-    print("TRAINING DATA")
+    start_time = time.time()
 
-    np.random.seed(seed)
-    num_instances = min_num + \
-        np.random.poisson(lam=lam, size=num_train_batches)
-    mean_vars = np.random.normal(
-        loc=0, scale=mean, size=[num_train_batches, batch_size, 1, x_dim])
-    sdev_vars = np.abs(np.random.normal(
-        loc=0, scale=scale, size=[num_train_batches, batch_size, 1, x_dim]))**2
+    train_u, train_v = gt_factors(num_train_batches, batch_size, rng)
+    train_x = generator(train_u, train_v)
+    train_data = [train_x, train_u, train_v]
 
-    train_data = []
-    for batch_idx in tqdm(range(num_train_batches)):
-        inst_vars = np.random.normal(
-            loc=0, scale=1, size=[batch_size, num_instances[batch_idx], x_dim])
+    _, mins, secs = elapsed_time(start_time)
+    print("Training dataset took %dm%ds to generate" %
+          (mins, secs))
 
-        x = mean_vars[batch_idx] + sdev_vars[batch_idx] * inst_vars
-        train_data.append(x)
+    # Testing A
+    start_time = time.time()
 
-    # Testing x
-    print("TESTING X")
+    test_a_u, test_a_v = gt_factors(num_test_batches, batch_size, rng)
+    train_a_x = generator(test_a_u, test_a_v)
+    test_a = [train_a_x, test_a_u, test_a_v]
 
-    num_instances = min_num + np.random.poisson(lam=lam, size=num_test_groups)
-    mean_vars = np.random.normal(
-        loc=0, scale=mean, size=[num_test_groups, x_dim])
-    sdev_vars = np.abs(np.random.normal(
-        loc=0, scale=scale, size=[num_test_groups, x_dim]))**2
-
-    test_x = []
-    inst_vars = []
-    for group_idx in tqdm(range(num_test_groups)):
-        inst_vars.append(np.random.normal(
-            loc=0, scale=1, size=[num_instances[group_idx], x_dim]))
-        x = mean_vars[group_idx] + sdev_vars[group_idx] * inst_vars[group_idx]
-        test_x.append(x)
+    _, mins, secs = elapsed_time(start_time)
+    print("Testing dataset A took %dm%ds to generate" %
+          (mins, secs))
 
     # Testing translation (shares inst vars with x)
-    print("TESTING TRANSLATION")
+    start_time = time.time()
 
-    mean_vars = np.random.normal(
-        loc=0, scale=mean, size=[num_test_groups, x_dim])
-    sdev_vars = np.abs(np.random.normal(
-        loc=0, scale=scale, size=[num_test_groups, x_dim]))**2
+    test_ab_u, _ = gt_factors(num_test_batches, batch_size, rng)
+    train_ab_x = generator(test_ab_u, test_a_v)
+    test_ab = [train_ab_x, test_ab_u, test_a_v]
 
-    test_trans = []
-    for group_idx in tqdm(range(num_test_groups)):
-        x = mean_vars[group_idx] + sdev_vars[group_idx] * inst_vars[group_idx]
-        test_trans.append(x)
+    _, mins, secs = elapsed_time(start_time)
+    print("Testing dataset translation took %dm%ds to generate" %
+          (mins, secs))
 
     # Testing y (shares mean and sdev with trans)
-    print("TESTING Y")
+    start_time = time.time()
 
-    num_instances = min_num + np.random.poisson(lam=lam, size=num_test_groups)
+    _, test_b_v = gt_factors(num_test_batches, batch_size, rng)
+    train_b_x = generator(test_ab_u, test_b_v)
+    test_b = [train_b_x, test_ab_u, test_b_v]
 
-    test_y = []
-    for group_idx in tqdm(range(num_test_groups)):
-        inst_vars = np.random.normal(
-            loc=0, scale=1, size=[num_instances[group_idx], x_dim])
+    _, mins, secs = elapsed_time(start_time)
+    print("Testing dataset B took %dm%ds to generate" %
+          (mins, secs))
 
-        x = mean_vars[group_idx] + sdev_vars[group_idx] * inst_vars
-        test_y.append(x)
-
-    return train_data, test_x, test_y, test_trans
+    return train_data, test_a, test_b, test_ab
 
 
 if __name__ == '__main__':
-    train_data, test_x, test_y, test_trans = generate_dataset()
-
-    print(train_data[0].shape)
-    print(test_x[0].shape)
-
-    plot_1D_data(test_x, "Data", "results/data")
+    train_data, test_a, test_b, test_ab = generate_dataset()
+    plot_1D_data(test_a[0][0], "Data", "results/data")
+    plot_1D_trans(
+        test_a[0][0], test_b[0][0], test_ab[0][0], "Data", "results/data")

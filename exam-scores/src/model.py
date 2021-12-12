@@ -9,13 +9,11 @@ from src.loss_funcs import elbo_func, v_vs_n_func, nemeth_func
 class Model(nn.Module):
     def __init__(
             self, group_acc=None, inst_cond=True, reg=None, x_dim=1, u_dim=2,
-            v_dim=1, h_dim=32, lr=1e-4, cuda=False, wd=1e-0):
+            v_dim=1, h_dim=32, lr=1e-4, wd=1e-0):
         super().__init__()
         self.group_acc = group_acc
         self.inst_cond = inst_cond
         self.reg = reg
-        self.u_dim = u_dim
-        self.v_dim = v_dim
 
         # create group encoder network depending on the accumulation method
         if self.group_acc == "acc":
@@ -31,7 +29,7 @@ class Model(nn.Module):
             self.inst_enc = InstEncoder(x_dim, u_dim, v_dim, h_dim)
 
         # create decoder network
-        self.decoder = DecoderGiven(x_dim, u_dim, v_dim, h_dim)
+        self.decoder = DecoderGiven()
 
         # create adversary network depending on which regularization to use
         if self.reg == "v_vs_n":
@@ -52,11 +50,6 @@ class Model(nn.Module):
             self.adv_params = list(self.adv_u.parameters()) + \
                 list(self.adv_v.parameters())
         self.adv_coeff = 1e+3
-
-        # calling cuda() here will put all the parameters of the model on GPU
-        self.use_cuda = cuda
-        if self.use_cuda:
-            self.cuda()
 
         # setup the optimizer
         self.model_params = list(self.group_enc.parameters()) + \
@@ -185,5 +178,3 @@ class Model(nn.Module):
         loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()
-
-        return loss

@@ -5,102 +5,100 @@ import time
 import numpy as np
 
 from utils.helpers import prepare_data, trans_test, rec_test, latent_test, \
-    rec_error, latent_error, elapsed_time
-from utils.plots import plot_1D_trans, plot_1D_latent
+    rec_error, elapsed_time
+from utils.plots import plot_1D_trans
 from utils.toy_data import generate_dataset
-# from utils.uniform_data import generate_dataset
 from src.model import Model
+from src.latent_pred import LatentPred
 
 
 def train(
-        group_acc=None, inst_cond=True, reg=None,  cuda=False, wd=1e-6,
-        num_train_batches=1024, batch_size=64, num_test_groups=128,
+        group_acc=None, inst_cond=True, reg=None,
+        num_train_batches=1024, batch_size=64, num_test_batches=128,
         num_epochs=64, test_freq=16, lr=1e-4, result_path=None, seed=2):
-    x_dim = 1
 
     # Path to save test results
     if result_path is None:
         result_path = os.path.join("results", f"{group_acc}_{inst_cond}_{reg}")
     result_prog_path = result_path + "_prog"
 
-    # setup data lists
-    train_data, test_x, test_y, test_trans = generate_dataset(
-        x_dim=x_dim, num_train_batches=num_train_batches,
-        batch_size=batch_size, num_test_groups=num_test_groups, seed=seed)
+    # Setup datasets
+    train_data, test_a, test_b, test_ab = generate_dataset(
+        num_train_batches=num_train_batches, num_test_batches=num_test_batches,
+        batch_size=batch_size, seed=seed)
 
-    # dictionary of results to be stored for testing
+    train_x = train_data[0]
+    train_u = train_data[1]
+    train_v = train_data[2]
+
+    test_a_x = test_a[0]
+    test_a_u = test_a[1]
+    test_a_v = test_a[2]
+
+    test_b_x = test_b[0]
+    test_ab_x = test_ab[0]
+
+    # Dictionary of results to be stored for testing
     test_dict = {}
     test_dict['rec_error'] = {}
     test_dict['trans_error'] = {}
-    test_dict['latent_mean'] = {}
-    test_dict['latent_var'] = {}
+    test_dict['u_error'] = {}
+    test_dict['v_error'] = {}
 
-    # setup the model
+    # Setup the models
     model = Model(
-        group_acc=group_acc, inst_cond=inst_cond, reg=reg, x_dim=x_dim,
-        lr=lr, cuda=cuda, wd=wd)
+        group_acc=group_acc, inst_cond=inst_cond, reg=reg, lr=lr)
+    u_net = LatentPred(lr=lr, z_dim=2)
+    v_net = LatentPred(lr=lr, z_dim=1)
 
     # training loop
     start_time = time.time()
     for epoch in range(num_epochs):
-        # initialize loss accumulator
-        epoch_loss = 0.
-        # do a training epoch over each mini-batch x returned
-        # by the data loader
-        for x in train_data:
-            # do ELBO gradient and accumulate loss
-            epoch_loss += model.step(prepare_data(model, x))
-
-        """
-        # report training diagnostics
-        normalizer_train = len(train_data)
-        total_epoch_loss_train = epoch_loss / normalizer_train
-        print("> [epoch %03d]  Training loss: %.4f" %
-              (epoch, total_epoch_loss_train))
-        """
+        for x, u, v in zip(train_x, train_u, train_v):
+            model.step(prepare_data(x))
+            u_inf, v_inf = model.inference(prepare_data(x))
+            u_net.step(u_inf.detach(), prepare_data(u))
+            v_net.step(v_inf.detach(), prepare_data(v))
 
         # Testing
         result_name = result_path + f" @ epoch {epoch+1}"
 
-        # current time
-        elapsed, mins, secs = elapsed_time(start_time)
-        per_epoch = elapsed / (epoch + 1)
-        print("> Training [%s / %d] took %dm%ds, %.1fs/epoch" %
-              (result_name, num_epochs, mins, secs, per_epoch))
-
-        # test reconstruction
-        rec_batch = rec_test(model, test_x)
-        rec_err = rec_error(test_x, rec_batch)
-        print("[epoch %03d]  reconstruction error: %.4f" %
-              (epoch, np.sum(rec_err)))
+        # Test reconstruction
+        rec_batch = rec_test(model, test_a_x)
+        rec_err = rec_error(test_a_x, rec_batch)
         test_dict['rec_error'][epoch] = rec_err
 
-        # test translation
-        trans_batch = trans_test(model, test_x, test_y)
-        trans_err = rec_error(test_trans, trans_batch)
-        print("[epoch %03d]  translation error: %.4f" %
-              (epoch, np.sum(trans_err)))
+        # Test translation
+        trans_res = trans_test(model, test_a_x, test_b_x)
+        trans_err = rec_error(test_ab_x, trans_res)
         test_dict['trans_error'][epoch] = trans_err
 
         # Plot
         if (epoch+1) % test_freq == 0:
-            plot_1D_trans(test_x, test_y, trans_batch,
+            plot_1D_trans(test_a_x[0], test_b_x[0], trans_res[0],
                           result_name, result_path)
 
-        # test latents
-        v_batch = latent_test(model, test_x)
-        mean_err, var_err = latent_error(v_batch)
+        # Test the accuracy of predicting the true latents from the inferred ones
+        u_pred, v_pred = latent_test(model, u_net, v_net, test_a_x)
+        u_error = rec_error(u_pred, test_a_u)
+        v_error = rec_error(v_pred, test_a_v)
         # Ridiculous but necessary for the purpose of serialization
-        mean_err = [float(x) for x in mean_err]
-        var_err = [float(x) for x in var_err]
-        print("[epoch %03d]  latent mean: %.4f, latent var: %.4f" %
-              (epoch, np.sum(mean_err), np.sum(var_err)))
-        test_dict['latent_mean'][epoch] = mean_err
-        test_dict['latent_var'][epoch] = var_err
+        u_error = [float(x) for x in u_error]
+        v_error = [float(x) for x in v_error]
+        test_dict['u_error'][epoch] = u_error
+        test_dict['v_error'][epoch] = v_error
 
-        # Plot
-        if (epoch+1) % test_freq == 0:
-            plot_1D_latent(v_batch, result_name, result_path)
+        # Current time
+        elapsed, mins, secs = elapsed_time(start_time)
+        per_epoch = elapsed / (epoch + 1)
+        print("> Training [%s / %d] took %dm%ds, %.1fs/epoch" %
+              (result_name, num_epochs, mins, secs, per_epoch) +
+              "\nReconstruction error: %.4f" %
+              (np.mean(rec_err)) +
+              "\nTranslation error: %.4f" %
+              (np.mean(trans_err)) +
+              "\nGroup prediction error: %.4f, Instance prediction error: %.4f" %
+              (np.mean(u_error), np.mean(v_error)))
 
         # Save json file of test results
         jsonString = json.dumps(test_dict)

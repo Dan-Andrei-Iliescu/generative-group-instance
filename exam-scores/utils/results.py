@@ -4,7 +4,7 @@ import json
 import os
 
 from utils.plots import plot_results
-from utils.helpers import compute_results
+from utils.helpers import save_results
 
 
 def results(result_dir="results"):
@@ -23,7 +23,7 @@ def results(result_dir="results"):
             print("Not json")
 
     plot_results(test_dict, result_dir)
-    compute_results(test_dict, result_dir)
+    save_results(test_dict, result_dir)
 
 
 if __name__ == '__main__':

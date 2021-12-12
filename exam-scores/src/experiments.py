@@ -31,7 +31,7 @@ def exp(result_dir="results", exp_name=None, training=True):
         lr_vals = [3, 4, 6]
         lr_def = 4
 
-        seed_vals = [2, 8, 32]
+        seed_vals = [2, 8, 32, 128, 512]
 
         # Select relevant conditions based on the requested experiment
         cond_dicts = []
@@ -80,6 +80,17 @@ def exp(result_dir="results", exp_name=None, training=True):
                     dict['lr'] = lr_def
                     dict['seed'] = seed
                     cond_dicts.append(dict)
+        elif exp_name == "just_one":
+            for seed in seed_vals:
+                dict = {}
+                dict['group_acc'] = group_acc_def
+                dict['inst_cond'] = inst_cond_def
+                dict['reg'] = reg_def
+                dict['num_train_batches'] = num_train_batches_def
+                dict['batch_size'] = batch_size_def
+                dict['lr'] = lr_def
+                dict['seed'] = seed
+                cond_dicts.append(dict)
 
         # Run in parallel training for all conditions
         start_time = time.time()

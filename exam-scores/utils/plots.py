@@ -5,7 +5,7 @@ import os
 
 NUM_GROUPS_PER_PLOT = 16
 FIG_SIZE = 1200
-BIG_FIG_SIZE = 1600
+BIG_FIG_SIZE = 1400
 
 
 def compute_colours():
@@ -214,8 +214,8 @@ def plot_1D_rec(x, y, title):
 def moving_avg(a, n):
     s = np.cumsum(a)
     s[n:] = s[n:] - s[:-n]
-    s = s[n-1:] / n
-    return s
+    a[n-1:] = s[n-1:] / n
+    return a
 
 
 def plot_results(test_dict, result_dir):
@@ -223,32 +223,33 @@ def plot_results(test_dict, result_dir):
         rows=2, cols=2, shared_xaxes=True,
         row_heights=[0.5, 0.5],
         subplot_titles=["a) Reconstruction Error", "b) Translation Error",
-                        "c) Error of Latent Mean (MSE)",
-                        "d) Error of Latent Standard Deviation (MSE)"],
+                        "c) Group Prediction Error",
+                        "d) Instance Prediction Error"],
         vertical_spacing=0.05)
     colours = compute_colours()
 
-    model_names = list(test_dict.keys())
-    for idx in range(len(model_names)):
-        model_name = model_names[idx]
-        plot_names = list(test_dict[model_name].keys())
+    cond_names = list(test_dict.keys())
+    for idx in range(len(cond_names)):
+        cond_name = cond_names[idx]
+        test_names = list(test_dict[cond_name].keys())
         rows = [1, 1, 2, 2]
         cols = [1, 2, 1, 2]
 
         is_showlegend = True
-        for plot_name, row, col in zip(plot_names, rows, cols):
-            epochs = list(test_dict[model_name][plot_name].keys())
+        for test_name, row, col in zip(test_names, rows, cols):
+            epochs = list(test_dict[cond_name][test_name].keys())
 
             error_med = []
             error_lo = []
             error_hi = []
             for epoch in epochs:
-                runs = test_dict[model_name][plot_name][epoch]
-                error_med.append(np.mean(runs))
-                error_lo.append(np.mean(np.sort(
-                    [np.mean(run) for run in runs])[:2]))
-                error_hi.append(np.mean(np.sort(
-                    [np.mean(run) for run in runs])[1:]))
+                runs = test_dict[cond_name][test_name][epoch]
+                run_means = np.array([np.mean(run) for run in runs])
+                error_quants = np.quantile(run_means, [0.25, 0.5, 0.75])
+
+                error_lo.append(error_quants[0])
+                error_med.append(error_quants[1])
+                error_hi.append(error_quants[2])
             n = 5
             error_med = moving_avg(error_med, n)
             error_lo = moving_avg(error_lo, n)
@@ -257,22 +258,22 @@ def plot_results(test_dict, result_dir):
             fig.add_trace(go.Scatter(
                 x=epochs,
                 y=error_med,
-                legendgroup=model_name, showlegend=is_showlegend,
+                legendgroup=cond_name, showlegend=is_showlegend,
                 mode="lines+markers",
                 marker=dict(color=colours[0][idx % len(colours[0])]),
-                name=model_name
+                name=cond_name
             ), row=row, col=col)
             is_showlegend = False
             fig.add_trace(go.Scatter(
                 x=epochs,
                 y=error_lo,
-                legendgroup=model_name, showlegend=is_showlegend,
+                legendgroup=cond_name, showlegend=is_showlegend,
                 mode="lines", line=dict(width=0)
             ), row=row, col=col)
             fig.add_trace(go.Scatter(
                 x=epochs,
                 y=error_hi,
-                legendgroup=model_name, showlegend=is_showlegend,
+                legendgroup=cond_name, showlegend=is_showlegend,
                 mode="lines", line=dict(width=0),
                 fillcolor=colours[1][idx % len(colours[0])],
                 fill='tonexty'
