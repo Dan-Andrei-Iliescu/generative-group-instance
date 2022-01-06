@@ -1,10 +1,13 @@
 # Entangled Grouped Data
-**2021-12-13**
 *Dan Andrei Iliescu*
 
-> **TODO:** Write introduction summarizing the background, contribution and results.
+## **1. Introduction**
 
-## Generative Group-Instance
+We propose a modification to the Group Variational Autoencoder family which improves the model's performance on a class of problems that we call "entangled".
+
+> **TODO:** Write introduction
+
+## **2. Generative Group-Instance**
 
 The Group Variational Autoencoder ([Bouchacourt2018MultiLevelVA](https://api.semanticscholar.org/CorpusID:1209557), [Hosoya2019GroupbasedLO](https://api.semanticscholar.org/CorpusID:199466320)) is a family of models that use two latent variables to represent grouped data: one that captures the variation within groups, and one for the variation across groups.
 
@@ -18,7 +21,7 @@ We omit the index of the group $i$ for notational simplicity, since the groups a
 
 > **Figure 1:** Probabilistic graphical model of the VAE (left) and the GVAE (right). The dotted arrows depict the variational latent posterior, and the blue arrow shows a dependency which is absent from the GVAE but present in our proposed model.
 
-### Variational Inference
+### **2.1 Variational Inference**
 
 Because the exact likelihood is intractable, the Variational Autodencoder ([Kingma2014AutoEncodingVB](https://api.semanticscholar.org/CorpusID:216078090), [JimenezRezende2014StochasticBA](https://api.semanticscholar.org/CorpusID:16895865)) performs optimization by introducting a variational latent posterior $q(u, v_{[1:K]} | x_{[1:K]})$ and maximizing the Evidence Lower Bound ([Jordan2004AnIT](https://api.semanticscholar.org/CorpusID:2073260)):
 
@@ -28,37 +31,56 @@ $$\log p(x_{[1:K]}) \geq \mathbb{E}_{q(u, v_{[1:K]} | x_{[1:K]})} [\log p(x_{[1:
 
 $$q(u, v_{[1:K]} | x_{[1:K]}) = q(u | x_{[1:K]}) \prod_{k=1}^K q(v_k | x_k)$$
 
-In this work, we show that this assumption hinders disentanglement when the generative model is entangled.
+In our work, we show that this assumption hinders disentanglement when the generative model is entangled.
 
-### Group Encoder
+### **2.2 Group Encoder**
 
-> **TODO:** Describe how the GVAE implements the Group Encoder.
-> $$p(u | x_{[1:K]}) = \frac{\prod_{k=1}^K p(x_k)}{p(x_{[1:K]})} \frac{1}{p(u)^{K-1}} \prod_{k=1}^K p(u | x_k)$$
+The variational group posterior is realised as normal density with $\mu, \Sigma$ computed with an encoder network. The way to implement the encoder network is not obvious, since the number of inputs $K$ varies across groups. [Hosoya2019GroupbasedLO](https://api.semanticscholar.org/CorpusID:199466320) encode separately each observation in the group using the same encoder $E_u$ to produce $\mu_k, \Sigma_k$ and then averages the outputs.
 
-### Regularization
+$$\mu = \frac{1}{N} \sum_{k=1}^K \mu_k, ~ \Sigma = \frac{1}{N} \sum_{k=1}^K \Sigma_k$$
+
+[Bouchacourt2018MultiLevelVA](https://api.semanticscholar.org/CorpusID:1209557) also encode each observation individually and then accumulate the evidence through a product of normal densities, computed using the following equations:
+
+$$\Sigma^{-1} = \sum_{k=1}^K \Sigma_k^{-1}, ~ \mu^T \Sigma^{-1} = \sum_{k=1}^K \mu_k^T \Sigma_k^{-1}$$
+
+They justify that such a product of normals produces a valid evidence accumulation using the following result:
+
+$$q(u | x_{[1:K]}) \propto \prod_{k=1}^K q(u | x_k)$$
+
+However, the above is not a universal property, since
+
+$$q(u | x_{[1:K]}) = \frac{\prod_{k=1}^K q(x_k)}{q(x_{[1:K]})} \frac{1}{q(u)^{K-1}} \prod_{k=1}^K q(u | x_k) \propto \frac{1}{q(u)^{K-1}} \prod_{k=1}^K q(u | x_k)$$
+
+In fact, by using a product of normals to accumulate evidence, the authors implicitly assume that the marginal distribution of the inferred group variable is a uniform. This has the effect of sampling $u$ values which are less representative of the current group and more skewed towards the marginal distribution of $u$.
+
+In our work, we propose a more general approach to encoding $u$ by using a Deep Sets  network ([Zaheer2017Deep](https://api.semanticscholar.org/CorpusID:4870287)) to encode the whole set of observations instead of encoding each observation separately.
+
+### **2.3 Regularization**
 
 In certain cases, the model might learn to encode both kinds of variation (within- and across-group) in the instance variable, effectively turning the model into a standard VAE. In this eventuality, the group variable becomes irrelevant and disentanglement is not achieved.
 
 Such behaviour has been identified by [Hosoya2019GroupbasedLO](https://api.semanticscholar.org/CorpusID:199466320) and [Nemeth2020Adversarial](https://api.semanticscholar.org/CorpusID:210472540) to occur when the instance code too high-dimensional, the instance encoder too expressive, or group sizes too small. One solution is to limit the dimensionality of the instance code ([Hosoya2019GroupbasedLO](https://api.semanticscholar.org/CorpusID:199466320)), with the downside of hindering the overall model performance. 
 
-As a more targeted solution, [Nemeth2020Adversarial](https://api.semanticscholar.org/CorpusID:210472540) propose an adversarial loss minimizing the mutual information between an observation and the instance variable inferred from the other observations in the group.
+As a more targeted solution, [Nemeth2020Adversarial](https://api.semanticscholar.org/CorpusID:210472540) propose an adversarial loss minimizing the mutual information between an observation and the instance variable inferred from the other observations in the group:
 
-For this, they define $r(x, v) = r(v | x) r(x)$ as the joint distribution of an observation and the instance variable inferred from any of the other observations in the group, where
+$$I_{r} (x, v) = \mathrm{KL} [r(x, v) || r(x) r(v)]$$
+
+where $r(x, v) = r(v | x) r(x)$ is the joint distribution of an observation and the instance variable inferred from any of the other observations in the group and 
 
 $$r(v | x_k) = \frac{1}{K - 1} \sum_{l=1, ~ l \neq k}^K q(v | x_l)$$
 
-and 
+The mutual information is approximated empirically using the results of [Belghazi2018Mutual](https://api.semanticscholar.org/CorpusID:44220142).
 
-$$I_{r} (x_{[-k]}, v_k) = \mathbb{E}_{r(x_{[-k]}, v_k)} \log \frac{r(x_{[-k]}, v_k)}{\overline{r}(x_{[-k]}, v_k)}$$
+$$I_{r} (x, v) \approx \max_{T} \mathbb{E}_{r(x, v)} [T(x, v)] - \log \mathbb{E}_{r(x)r(v)} [\exp T(x, v)]$$
 
-where $r(x_{[-k]}, v_k) = \prod_{l=1, l \neq k}^K q(v_k | x_l)$
+$T$ is a neural network and the expectation terms are computed by sampling.
 
-> **TODO:** Explain how the adversarial regularization works.
+- To sample $r(x, v)$, first choose a group $i$, then choose two instances from that group $k, l \in K_i$. $x$ will be the observation $x_{ik}$ and $v$ will be sampled from $q(v | x_{il})$.
+- To sample $r(x)r(v)$, choose two groups $i, j$ and two instances in each group $k \in K_i, l \in K_j$. Take $x_{ik}$ for $x$ and sample $q(v | x_{jl})$.
 
+In our view, this method has the following limitation: Even when the instance variable does contain group information, the value of $I_{r} (x, v)$ might still be small, because it might be difficult to ascertain the group based on one single observation $x$. In our work, we propose a modification to this regularization term such that the network $T$ takes as input all the observations in the group instead of only one.
 
-
-
-## Entangled Group and Instance Variables
+## **3. Entangled Group and Instance Variables**
 
 We call the group and instance variables *entangled* when they are not independent conditioned on the data $p(u, v | x) \neq p(u | x) p(v | x)$. A useful heuristic for establishing whether the variables are entangled is to ask "Does knowing the group variable for an observation influence my belief about its instance variable?"
 
@@ -68,7 +90,7 @@ This property of the generative model is present in many machine learning tasks,
 
 In this paper, we claim that the current methods in the GVAE family do not perform well in tasks where the group and instance variables are entangled.
 
-### Exam-Scores Problem
+### **3.1 Exam-Scores Problem**
 
 Suppose we wanted to model the exam scores of students from different schools. Our model must separate the school-level effect (the group factor) from the student-level effect (the instance factor). We define the following generative model:
 
@@ -78,26 +100,32 @@ where $x_{ij}$ is the student score, $u_i = (\mu_i, \sigma_i)$ is the school-lev
 
 We first sample the model to generate a dataset ($N = 32,768, ~ K_i \sim \mathrm{Poisson} (16) + 8$) and then use the same model as the generative model in our Variational Autoencoder, instead of a neural network. The figure below shows what the data looks like.
 
-![](files/data.svg)
+![data](files/data.svg)
 
 > **Figure 2:** Normalized exam scores of individual students grouped by school.
 
 Looking at the data, it is easy to see that this model is entangled, because the relative performance $v$ of a student within their own school, given their absolute score $x$, depends on the distribution of scores within the school $u$.
 
-## Context-Aware Variational Autoencoder (CxVAE)
+## **4. Context-Aware Variational Autoencoder (CxVAE)**
 
-We propose a new model which can perform well on these tasks. We call our model the Context-Aware Variational Autoencoder. Our model comprises the following changes with respect to the standard GVAE:
-1. The group encoder is implemented as a DeepSet network ([Zaheer2017DeepS](https://api.semanticscholar.org/CorpusID:4870287)). The encoder has the following form:
-   $$E_U (x_{[1:K]}) = E^B_U \left( \sum_{k=1}^K E^A_U (x_k)\right)$$
-   where $E^A_U, E^B_U$ are two neural networks.
+We propose a new model which can perform well on datasets generated from entangled group and instance variable. We call our model the Context-Aware Variational Autoencoder. Our model comprises the following changes with respect to the standard GVAE:
+1. The group encoder is implemented as a Deep Sets network ([Zaheer2017DeepS](https://api.semanticscholar.org/CorpusID:4870287)). The encoder has the following form:
+   $$\mu, \Sigma = E_u (x_{[1:K]}) = E^B_u \left( \sum_{k=1}^K E^A_u (x_k)\right)$$
+   where $E^A_u, E^B_u$ are two neural networks.
 2. The variational instance posterior is dependent on the inferred group variable:
    $$q(u, v_{[1:K]} | x_{[1:K]}) = q(u | x_{[1:K]}) \prod_{k=1}^K q(v_k | x_k, u)$$
-   In practice, our instance encoder takes as input a vector concatenating $x_k$ and $u$. This idea is not new, and has been used previously in sequence disentanglement ([Li2018Disentangled](https://api.semanticscholar.org/CorpusID:48353305)).
-3. We propose a regularization loss using a variational approximation to the Information Bottleneck principle inspired by [Moyer2018Invariant](https://api.semanticscholar.org/CorpusID:53219212).
+   In practice, our instance encoder takes as input a vector concatenating $x_k$ and $u$. This idea is not new, and has been used previously in sequence disentanglement ([Li2018Disentangled](https://api.semanticscholar.org/CorpusID:48353305)). This allows the instance encoder to differentiate the between observations with similar values but which come from different groups.
+3. We propose a regularization objective similar to the one in [Nemeth2020Adversarial](https://api.semanticscholar.org/CorpusID:210472540), but whereby we minimize *the mutual information between one inferred instance variable and all the other observations in the group*. More precisely, our objective is to minimize $I_r (x_{[-k]}, v_k)$ where $r(v_k | x_{[-k]}) = q(v_k | x_k, u)$. Following the same approximation as in [Nemeth2020Adversarial](https://api.semanticscholar.org/CorpusID:210472540), the objective takes the following form:
+    $$I_{r} (x_{[-k]}, v_k) \approx \max_{T} ~ \mathbb{E}_{r(x_{[-k]}, v_k)} [T(x_{[-k]}, v_k)] - \log \mathbb{E}_{r(x_{[-k]}) r(v_k)} [\exp T(x_{[-k]}, v_k)]$$
+    $T$ is implemented as a Deep Sets neural network for the observations, with the instance code concatenated in the middle:
+    $$T(x_{[-k]}, v_k) = T^\beta \left(v_k, \frac{1}{K} \sum_{l=1, ~ l \neq k}^K T^\alpha (x_l) \right)$$
+    Again, the expectations are computed by sampling:
+    - To sample $r(x, v)$, first choose a group $i$, then choose one instance from that group $k \in K_i$. $x_{[i, -k]}$ will be all the observations in the group apart from $k$, and $v_k$ will be sampled from $q(v | x_{ik})$.
+    - To sample $r(x_{[-k]})r(v_k)$, choose two groups $i, j$ and two instances in each group $k \in K_i, ~ l \in K_j$. Take $x_{[i, -k]}$ for $x_{[-k]}$ and sample $q(v | x_{jl})$.
+    
+    This regularization objective also minimizes the mutual information between the inferred instance variables and the true data generating group variable, but uses as a proxy for the latter all but one of the observations in the group, instead of just one observation.
 
-> **TODO:** Describe my changes to the regularization procedure.
-
-## How to Measure Disentanglement
+## **5. Measuring Disentanglement**
 
 In the context of the GVAE family, disentanglement is a property of the variational latent posterior. The inferred group and instance variables are disentangled when they are maximally informative about the group and instance variables of the true data generating distribution. We assume this true model has the same factorization of the joint distribution as the generative model, but the parameters are unknown.
 
@@ -110,7 +138,7 @@ $$= \mathbb{E}_{U^q} \mathbb{E}_{U^t | U^q} [ \log \mathrm{Pr}_{U^t | U^q}] + \m
 
 We estimate the density $\mathrm{Pr}_{U^t | U^q}$ by training a regression network to predict the value of $U^t$ given $U^q$. The mean-squared error of the prediction on the holdout set is a monotonic function of the mutual information with respect to changes in $q$.
 
-> **TODO:** Decide what notation can be used. Is engineering notation sufficient, or do we need to separate between distribution functions and random variables?
+> **TODO:** Decide what notation to use. Is engineering notation sufficient, or do we need to separate between density functions and random variables? I'm also playing a bit fast and loose with the indices.
 
 ```python
 def measure_disentanglement(train_x, test_x, q):
@@ -143,7 +171,9 @@ def measure_disentanglement(train_x, test_x, q):
     return u_error, v_error  
 ```
 
-### Unsupervised Translation
+> **Algorithm 1:** Measuring disentanglement by the accuracy of a network which predicts the true latent variables from the inferred latent variables.
+
+### **5.1 Unsupervised Translation**
 
 Unsupervised translation is the process of transforming an observation by changing its group code while keeping its instance code fixed. This is a common downstream task for disentangled representations because it requires a clean separation between the group and instance representations ([Tenenbaum2000Separating](https://api.semanticscholar.org/CorpusID:9492646)). Therefore, it can be used to quantify the quality of disentanglement.
 
@@ -151,26 +181,25 @@ Formally, let $i, j$ be the indices of the source and target group, respectively
 
 We measure translation quality by taking the mean-squared error between the translation performed with each model and the ground-truth translation computed using the ground-truth factors and the true data-generating process.
 
-![](files/data_trans.svg)
+![trans](files/data_trans.svg)
 
 > **Figure 2:** Example of translation on the Exam-Scores dataset. The yellow and orange show the distributions of the source and target group, respectively. The red shows the distribution of the translated group. The grey lines show the translation of individual observations from the source to the target. We expect a good translation to have the translation lines uncrossed (the instance variable is preserved) and to have the same distribution as the target group (the group variable is changed).
 
 
-## Evaluation
+## **6. Evaluation**
 
-> **TODO:** Describe experimental setup.
+We test CxVAE against the other models from the GVAE family.
 
 | ![](files/ours.svg) | ![](files/theirs.svg) |
 | ------------------- | --------------------- |
 
-> **TODO:** State difference in qualitative performance between our model and the GVAE.
+> **Figure 3:** Qualitative comparison of unsupervised translation between CxVAE (left) and ML-VAE ([Bouchacourt2018MultiLevelVA](https://api.semanticscholar.org/CorpusID:1209557)) (right). Our model captures the distribution of values in the target group better than the existing methods.
 
-### Quantitative Evaluation
-> **TODO:** Describe results.
+### **6.1 Quantitative Evaluation**
 
 ![results](files/results.svg)
 
-> **Figure 3:** Errors on the holdout set by training epoch. We compare CxVAE (ours, yellow) with [Bouchacourt2018MultiLevelVA](https://api.semanticscholar.org/CorpusID:1209557) (purple), [Hosoya2019GroupbasedLO](https://api.semanticscholar.org/CorpusID:199466320) (orange), and
+> **Figure 4:** Errors on the holdout set by training epoch. We compare CxVAE (ours, yellow) with [Bouchacourt2018MultiLevelVA](https://api.semanticscholar.org/CorpusID:1209557) (purple), [Hosoya2019GroupbasedLO](https://api.semanticscholar.org/CorpusID:199466320) (orange), and
 [Nmeth2020AdversarialDW](https://api.semanticscholar.org/CorpusID:210472540) (red). For each model we perform 7 training runs, displaying the lowest, highest, and median error at each epoch.
 
 
@@ -183,7 +212,7 @@ We measure translation quality by taking the mean-squared error between the tran
 
 > **Table 1:** Comparison between errors on the holdout set of our model (CxVAE) and the rest of the GVAE family. CxVAE has the best performance across the 4 criteria. All errors are MSE, so lower is better. A mean error and standard deviation over the 7 training runs is taken at every epoch, and then the last 20 training epochs (44 - 64) are averaged in order to be displayed.
 
-### Ablation Study
+### **6.2 Ablation Study**
 
 In order to quantify the effect of each proposed improvement, we perform an ablation study whereby we measure the decrease in performance resulting from replacing a proposed element of our model with a current alternative.
 
@@ -202,15 +231,3 @@ In order to quantify the effect of each proposed improvement, we perform an abla
 > **Table 2:** Ablation study comparing CxVAE (our model) with alternative models obtained by replacing each of the novel components (group encoder, instance encoder and regularization). Each replacement leads to a worse performance across all criteria.
 
 The proposed improvements have the best individual performance with respect to both reconstruction and translation error in each of the three categories. The choice of a group-aware instance encoder leads to the most significant increase in performance.
-
-
-### Different dataset
-
-> **TODO:** Decide whether the effect of changes in the variance of the dataset is relevant for the paper.
-
-| ![](files/results_bad.svg) | ![](files/results.svg) |
-| -------------------------- | ---------------------- |
-
-## Conclusions
-
-> **TODO:** State conclusions.
