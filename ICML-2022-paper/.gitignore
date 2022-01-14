@@ -1,6 +1,5 @@
 *.sty
 *.aux
-*.pdf
 *.bbl
 *.blg
 *.out
@@ -9,4 +8,4 @@
 *.fdb_latexmk
 *.fls
 *.bst
-*__*.tex
+icml2022
