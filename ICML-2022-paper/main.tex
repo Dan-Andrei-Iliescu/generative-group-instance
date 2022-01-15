@@ -55,12 +55,12 @@
 
 % The \icmltitle you define below is probably too long as a header.
 % Therefore, a short form for the running title is supplied here:
-\icmltitlerunning{Context-Aware Variational Autoencoder for Grouped Partial Observations}
+\icmltitlerunning{Disentangling Emergent Groups}
 
 \begin{document}
 
 \twocolumn[
-\icmltitle{Context-Aware Variational Autoencoder for Grouped Partial Observations}
+\icmltitle{Disentangling Emergent Groups}
 
 % It is OKAY to include author information, even for blind
 % submissions: the style file will automatically remove it for you
@@ -106,33 +106,42 @@
 \printAffiliationsAndNotice{\icmlEqualContribution} % otherwise use the standard text.
 
 \begin{abstract}
-Group-instance disentanglement is the problem of learning separate representations for within-group and across-group variability. 
-The current state-of-the-art methods for solving this problem are based on the Group Variational Autoencoder (GVAE). 
-In this work, we create a synthetic dataset wherein the group and instance variables cannot be inferred accurately from a single datapoint.
-We use this dataset to show that models from the GVAE family are limited in how they 1) accumulate evidence for computing the group variable, 2) define the variational distribution of the instance variable, and 3) use adversarial training to prevent the instance encoder from encoding group information. 
-We overcome this failure case by modifying the encoder and loss function of the GVAE.
+Group-instance disentanglement is the problem of learning separate representations for within-group and across-group variation.  The current state-of-the-art methods for solving this problem follow the paradigm of the Group Variational Autoencoder (GVAE).  In our work, we introduce a simple synthetic dataset to show that these methods fail to learn disentangled representations on datasets with ``emergent groups''; i.e.  data where the group and instance variables cannot be inferred from a single datapoint. To overcome this limitation,  we propose the Context-Aware Variational Autoencoder, a modified GVAE that 1) infers the instance variable conditional on the group variable, 2) has a more expressive group encoder, 3) optimizes a regularization objective that encourages independence between the instance variable and the grouping. We show empirically the impact of each modification with respect to holdout data likelihood, unsupervised translation, and other disentanglement metrics.
 \end{abstract}
 
 \section{Introduction}
 \label{intro}
 
-The task is to learn representations of grouped data (e.g. images grouped by author, temperature readings grouped by weather station, etc) that separate between within-group and across-group variation. We encode the former with a latent \textit{instance} variable $v$ and the latter with a latent \textit{group} variable $u$. 
+\begin{figure}[t]
+    \vskip 0.2in
+    \begin{center}
+    \centerline{\includegraphics[width=\columnwidth]{files/bayes_net.pdf}}
+    \caption{Probabilistic graphical model of the VAE (left) and the GVAE (right). The dotted arrows depict the variational latent posterior. \textbf{The blue arrow shows a dependency which is absent from existing methods but present in our proposed model.}}
+    \label{bayes-net}
+    \end{center}
+    \vskip -0.2in
+\end{figure}
 
-Group-instance disentanglement is a version of weakly-supervised disentanglement which has attracted significant attention in recent years \citep{Tschannen2018RecentAI}. State-of-the-art methods for group-instance disentanglement \citep{Bouchacourt2018MultiLevelVA,Hosoya2019GroupbasedLO,Shu2020Weakly, Chen2020WeaklySD,Locatello2020WeaklySupervisedDW} follow the Variational Autoencoder framework \citep{Kingma2014AutoEncodingVB,JimenezRezende2014StochasticBA} whereby a generative model mapping latent variables to data observations is trained using variational inference. We call this family of models the Group Variational Autoencoder (GVAE).
+The goal of group-instance disentanglement is to learn a representation network that transforms grouped observations (e.g. images grouped by author,  temperature readings grouped by weather station,  etc) into two latent variables,  \textit{group} and \textit{instance}.  The group variable should capture the information which distinguishes one group from another, but exclude the information which can identify a particular observation within the group. The instance variable should do vice-versa: capture all of the individual information, but none of the group information.
 
-These methods promise a general approach for amortizing the cost of inference in nonlinear mixed models. 
+All the current state-of-the-art approaches to group-instance disentanglement \citep{Bouchacourt2018MultiLevelVA,Hosoya2019GroupbasedLO,Shu2020Weakly, Chen2020WeaklySD,Locatello2020WeaklySupervisedDW} follow the Variational Autoencoder framework \citep{Kingma2014AutoEncodingVB,JimenezRezende2014StochasticBA} whereby a generative model mapping latent variables (group and instance) to data observations is trained using variational inference. We call this family of models the Group Variational Autoencoder (GVAE). These methods vary in how they define the variational latent posterior and any additional regularization objectives they might have.
 
-However, the existing models in the GVAE family have been designed and applied on data where only one observation is strictly necessary to accurately infer the group and instance variables. For example, in style-content disentanglement (a popular evaluation setting), the style and content of an image can be ascertained comfortably without any knowledge of the other observations in the group \citep{Zhu2017UnpairedIT,Kotovenko2019ContentAS}.
+We believe that GVAE has the potential to advance many scientific fields where analysing the causal factors of grouped data is essential, including medicine \citep{Liang1986LongitudinalDA}, biology \citep{Quinn2002ExperimentalDA} and psychology \citep{Schafer2002MissingDO}. That analysis is typically performed using mixed-effects models \citep{Pinheiro2001MixedEffectsMI}, which decompose the data variation into random-effects (group variables) and individual error terms (instance variables). However, these parameters can only be estimated efficiently in very simple models. By contrast, the GVAE offers a highly expressive mixed-effects model (the decoder) and an inbuilt inference network (the encoder).
 
-Unfortunately, as we will show in this work, these methods fail to learn disentangled representations in settings where the same observation could be present in different groups, and therefore have different underlying instance components. For example, assume the observation is a binary result of a \textit{XOR} operation between the group and instance variables. Then, knowing the observation value gives no information about the instance in the absence of knowledge about the group. We call these settings \textit{entangled}, and they occur abundantly in real-world problems, such as collaborative filtering, novel-view synthesis, and disease progression modelling.
+In order to learn useful disentangled representations for these problems,  the GVAE has to capture the joint distribution between the group and instance variables conditioned on the data. In other words,  the representation network must be able to distinguish between two identical observations coming from different groups, thus encoding them with different instance variables.  We call data groups of this kind ``emergent'', because the group and instance variables are emergent properties of the group as a whole, rather than any individual observation. 
 
-To tackle this challenge, we propose several modifications to the standard GVAE which enable the model to infer the latent components more accurately. We implement the group encoder as a Deep Sets network \citep{Zaheer2017DeepS}, condition the instance variable on the inferred group variable \citep{Li2018DisentangledSA}, and introduce a novel regularization objective inspired by \citep{Nmeth2020AdversarialDW}.
+Emergent groups are very common, occurring in datasets where the latent variables cannot be accurately inferred from a single observation. For example, in the context of soybean plant growth \citep{Davidian1995NonlinearMF}, it is impossible to deduce the age (instance) of a plant based solely on its leaf weight (observation) without also knowing its genotype (group). 
+
+Unfortunately,  the current state-of-the-art methods fail to learn disentangled representations on emergent groups.We show this empirically by creating a simple dataset of student exam scores grouped by school. The groups in this dataset are emergent, because the instance variable captures the score of a student in relation to the distribution of scores at their school. Instead of disentangling, the existing methods mostly forego the group variable and use the instance variable to encode the variation across groups. The main
+
+In order to tackle this challenge, we propose a new GVAE model with several novel modifications. The main novelty is an instance encoder conditional on the previously inferred group variable, which enables the variational latent posterior to match the generative latent posterior.  Additionally, we use an expressive Deep Set network \citep{Zaheer2017DeepS} to infer the group variable more accurately, and also design a novel regularization objective that encourages independence between the inferred instance variable and the data group. 
 
 Our work comprises the following contributions:
 \begin{enumerate}
-    \item We formalize the notion of ``entangled'' problems and create a simple synthetic dataset on which the current GVAE methods fail to learn disentangled representations.
-    \item We propose a new model, called the Context-Aware Variational Autoencoder (CxVAE) which can learn disentangled representations in ``entangled'' settings.
-    \item We perform extensive evaluation showing that our model outperforms the existing methods in holdout-data log-likelihood, unsupervised translation, and mutual information between the inferred latents and the ground truth.
+    \item We formalize the notion of ``emergent'' groups and create a simple synthetic dataset on which the current GVAE methods fail to learn disentangled representations.
+    \item We propose a new model, called the Context-Aware Variational Autoencoder (CxVAE) which can learn disentangled representations on emergent groups.
+    \item We perform extensive evaluation showing that our model outperforms the existing methods in holdout-data log-likelihood, unsupervised translation, and ground-truth factor prediction.
+    \item We perform an ablation study showing the relative performance gain of each modification to the GVAE.
 \end{enumerate}
 
 \section{Generative Group-Instance}
@@ -144,17 +153,6 @@ Assume a dataset of the form $\{x_{ik}\}_{i \in 1:N, ~k \in 1:K_i}$ where $N$ is
 $$p(\mathbf{x}) = \mathbb{E}_{p(u)}  \prod_{k=1}^{K} \mathbb{E}_{p(v_{k})} ~ [p(x_{k} | u, v_{k})]$$
 
 We omit the index of the group $i$ for notational simplicity, since the groups are independent and identically distributed.
-
-
-\begin{figure}[ht]
-    \vskip 0.2in
-    \begin{center}
-    \centerline{\includegraphics[width=\columnwidth]{files/bayes_net.pdf}}
-    \caption{\textbf{Probabilistic graphical model of the VAE (left) and the GVAE (right).} The dotted arrows depict the variational latent posterior, and the blue arrow shows a dependency which is absent from the GVAE but present in our proposed model.}
-    \label{bayes-net}
-    \end{center}
-    \vskip -0.2in
-\end{figure}
 
 \subsection{Variational Inference}
 
