@@ -1,8 +1,10 @@
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import plotly.express as px
 import numpy as np
 import os
 import time
+import pandas as pd
 
 NUM_GROUPS_PER_PLOT = 16
 FIG_SIZE = 800
@@ -35,6 +37,53 @@ def compute_colours(palette=None):
                             f'rgba(70, 190, 190, {alpha})',
                             f'rgba(119, 191, 25, {alpha})'])
     return colours
+
+
+def colour_assign(model_name):
+    colour_dict = {
+        'Change regularization': 'rgb(45, 48, 71)',
+        'Change instance conditioning': 'rgb(200, 85, 61)',
+        'Change group encoder': 'rgb(88, 139, 139)',
+        'CxVAE': 'rgb(200, 85, 61)',
+        'Other SOTA': 'rgb(45, 48, 71)'
+    }
+    if model_name in colour_dict.keys():
+        return colour_dict[model_name]
+    return colour_dict['def']
+
+
+def group_assign(model_name):
+    name_dict = {
+        'True_ours_None': 'CxVAE',
+        'True_nemeth_None': 'Change regularization',
+        'True_None_None': 'Change regularization',
+        'False_ours_None': 'Change instance conditioning',
+        'True_ours_mul': 'Change group encoder',
+        'True_ours_med': 'Change group encoder',
+        'False_None_mul': 'Other SOTA',
+        'False_None_med': 'Other SOTA',
+        'False_nemeth_med': 'Other SOTA'
+    }
+    if model_name in name_dict.keys():
+        return name_dict[model_name]
+    return model_name
+
+
+def name_assign(model_name):
+    name_dict = {
+        'True_ours_None': 'CxVAE',
+        'True_nemeth_None': 'A',
+        'True_None_None': 'B',
+        'False_ours_None': 'C',
+        'True_ours_mul': 'D',
+        'True_ours_med': 'E',
+        'False_None_mul': 'ML-VAE',
+        'False_None_med': 'GVAE',
+        'False_nemeth_med': 'GVAE+Reg'
+    }
+    if model_name in name_dict.keys():
+        return name_dict[model_name]
+    return model_name
 
 
 def plot_1D_data(x, title, result_path):
@@ -232,82 +281,76 @@ def moving_avg(a, n):
     return a
 
 
-def plot_results(test_dict, result_dir, palette):
+def plot_results(df, result_dir, palette):
+    titles = ["a) Reconstruction Error", "b) Translation Error",
+              "c) U Prediction Error",
+              "d) V Prediction Error"]
     fig = make_subplots(
-        rows=2, cols=2, shared_xaxes=True,
-        row_heights=[0.5, 0.5],
-        subplot_titles=["a) Reconstruction Error", "b) Translation Error",
-                        "c) Group Prediction Error",
-                        "d) Instance Prediction Error"],
-        vertical_spacing=0.05)
-    colours = compute_colours()
+        rows=1, cols=4,
+        subplot_titles=titles,
+        vertical_spacing=0.05, horizontal_spacing=0.05)
 
-    cond_names = list(test_dict.keys())
-    for idx in range(len(cond_names)):
-        cond_name = cond_names[idx]
-        test_names = list(test_dict[cond_name].keys())
-        rows = [1, 1, 2, 2]
-        cols = [1, 2, 1, 2]
+    df = df.loc[df['epoch'] >= 25]
 
-        is_showlegend = True
-        for test_name, row, col in zip(test_names, rows, cols):
-            epochs = list(test_dict[cond_name][test_name].keys())
+    model_names = pd.unique(df['model_name'])
+    print(model_names)
 
-            error_med = []
-            error_lo = []
-            error_hi = []
-            for epoch in epochs:
-                runs = test_dict[cond_name][test_name][epoch]
-                run_means = np.array([np.mean(run) for run in runs])
-                error_quants = np.quantile(run_means, [0.25, 0.5, 0.75])
+    rows = [1, 1, 1, 1]
+    cols = [1, 2, 3, 4]
+    test_names = ['rec_error', 'trans_error', 'u_error', 'v_error']
+    seen = []
+    for plt_idx in range(4):
+        test_df = df.loc[df['test_name'] == test_names[plt_idx]]
+        group_df = test_df.groupby('model_name')['value'].mean()\
+            .reset_index().sort_values(by=['value'])
+        model_names = group_df['model_name']
+        for model_name in model_names:
+            model_df = test_df.loc[test_df['model_name'] == model_name]
+            fig.add_trace(go.Box(
+                x=model_df['model_name'].apply(name_assign),
+                y=model_df['value'],
+                marker_color=colour_assign(group_assign(model_name)),
+                notched=True,
+                name=group_assign(model_name),
+                legendgroup=group_assign(model_name),
+                showlegend=(group_assign(model_name) not in seen)
+            ), row=rows[plt_idx], col=cols[plt_idx])
+            seen.append(group_assign(model_name))
+        fig.add_trace(go.Scatter(
+            x=group_df['model_name'].apply(name_assign),
+            y=group_df['value'],
+            mode='lines+markers',
+            marker_color='green',
+            name='Mean error',
+            showlegend=("green" not in seen)
+        ), row=rows[plt_idx], col=cols[plt_idx])
+        seen.append("green")
 
-                error_lo.append(error_quants[0])
-                error_med.append(error_quants[1])
-                error_hi.append(error_quants[2])
-            n = 5
-            error_med = moving_avg(error_med, n)
-            error_lo = moving_avg(error_lo, n)
-            error_hi = moving_avg(error_hi, n)
-
-            fig.add_trace(go.Scatter(
-                x=epochs,
-                y=error_med,
-                legendgroup=cond_name, showlegend=is_showlegend,
-                mode="lines+markers",
-                marker=dict(color=colours[0][idx % len(colours[0])]),
-                name=cond_name
-            ), row=row, col=col)
-            is_showlegend = False
-            fig.add_trace(go.Scatter(
-                x=epochs,
-                y=error_lo,
-                legendgroup=cond_name, showlegend=is_showlegend,
-                mode="lines", line=dict(width=0)
-            ), row=row, col=col)
-            fig.add_trace(go.Scatter(
-                x=epochs,
-                y=error_hi,
-                legendgroup=cond_name, showlegend=is_showlegend,
-                mode="lines", line=dict(width=0),
-                fillcolor=colours[1][idx % len(colours[0])],
-                fill='tonexty'
-            ), row=row, col=col)
-
-    fig.update_yaxes(type='log')
-    fig.update_xaxes(title_text="Epochs", row=2)
+    fig.update_yaxes(title_text='Error (log MSE)', col=1)
+    fig.update_xaxes(row=1)
     fig.update_layout(
-        legend_title="Models",
+        legend_title="Legend",
         width=BIG_FIG_SIZE,
-        height=BIG_FIG_SIZE
+        height=FIG_SIZE,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
     )
     fig.update_layout(legend=dict(
         orientation="h",
-        yanchor="bottom",
-        y=-0.1,
-        xanchor="right",
-        x=1
+        yanchor="top",
+        y=1.1,
+        xanchor="left",
+        x=0
     ))
-    fig.write_image(os.path.join(result_dir, "results.svg"))
+    fig['layout'].update(margin=dict(l=0, r=0, b=0))
+    fig.update_xaxes(showline=True, linewidth=1,
+                     linecolor='black', mirror=True)
+    fig.update_yaxes(showline=True, linewidth=1, gridcolor='lightgrey',
+                     linecolor='black', mirror=True)
+
+    fig.write_image(os.path.join(result_dir, "results.pdf"))
+    time.sleep(2)
+    fig.write_image(os.path.join(result_dir, "results.pdf"))
 
 
 def violin_plot(test_dict, result_dir, palette):
@@ -319,6 +362,31 @@ def violin_plot(test_dict, result_dir, palette):
         subplot_titles=titles,
         vertical_spacing=0.05, horizontal_spacing=0.05)
     colours = compute_colours(palette)
+
+    rows = [1, 1, 1, 1]
+    cols = [1, 2, 3, 4]
+    cond_names = list(test_dict.keys())
+    totals = np.zeros([len(cond_names), ])
+    for idx in range(len(cond_names)):
+        cond_name = cond_names[idx]
+        test_names = list(test_dict[cond_name].keys())
+
+        total = 0
+        for test_name, row, col in zip(test_names, rows, cols):
+            epochs = list(test_dict[cond_name][test_name].keys())
+            errors = []
+            n = 20
+            for epoch in epochs[-n:]:
+                runs = test_dict[cond_name][test_name][epoch]
+                for run in runs:
+                    errors.append(np.mean(run))
+            total += np.mean(np.array(errors))
+        totals[idx] = total
+
+    p = np.argsort(totals)
+    s = np.empty(p.size, dtype=np.int32)
+    for i in np.arange(p.size):
+        s[p[i]] = i
 
     cond_names = list(test_dict.keys())
     for idx in range(len(cond_names)):
@@ -339,6 +407,7 @@ def violin_plot(test_dict, result_dir, palette):
             errors = np.array(errors)
 
             fig.add_trace(go.Box(
+                x=s[idx]*np.ones_like(errors),
                 y=errors,
                 marker=dict(color=colours[0][idx % len(colours[0])]),
                 name=idx+1,

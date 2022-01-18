@@ -2,28 +2,18 @@ import glob
 import fire
 import json
 import os
+import pandas as pd
 
-from utils.plots import violin_plot as plot
+from utils.plots import plot_results as plot
 from utils.helpers import save_results
 
 
 def results(result_dir="results", palette=None):
-    file_list = sorted(glob.glob(os.path.join(result_dir, "*")))
-    test_dict = {}
-    for file_path in file_list:
-        # Record model name
-        model_name = file_path.split("/")[-1]
+    result_path = os.path.join(result_dir, "results.csv")
+    test_df = pd.read_csv(result_path)
 
-        # Read test dict
-        try:
-            fileObject = open(file_path, "r")
-            jsonContent = fileObject.read()
-            test_dict[model_name] = json.loads(jsonContent)
-        except:
-            print("Not json")
-
-    plot(test_dict, result_dir, palette)
-    save_results(test_dict, result_dir)
+    plot(test_df, result_dir, palette)
+    # save_results(test_df, result_dir)
 
 
 if __name__ == '__main__':

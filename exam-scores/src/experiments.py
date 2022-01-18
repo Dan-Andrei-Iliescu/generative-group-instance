@@ -65,9 +65,9 @@ def exp(result_dir="results", exp_name=None, training=True):
                             dict['seed'] = seed
                             cond_dicts.append(dict)
         elif exp_name == "ours_vs_theirs":
-            group_accs = [None, None, "mul", "med", "med"]
-            inst_conds = [True, True, False, False, False]
-            regs = ["ours", None, None, None, "nemeth"]
+            group_accs = [None, "mul", "med", "med"]
+            inst_conds = [True, False, False, False]
+            regs = ["ours", None, None, "nemeth"]
 
             for seed in seed_vals:
                 conds = zip(group_accs, inst_conds, regs)
@@ -118,10 +118,7 @@ def exp(result_dir="results", exp_name=None, training=True):
             group_acc=dict['group_acc'], inst_cond=dict['inst_cond'],
             reg=dict['reg'], num_train_batches=dict['num_train_batches'],
             batch_size=dict['batch_size'], lr=0.1**dict['lr'],
-            seed=dict['seed'], result_path=os.path.join(
-                exp_dir, "%s-%s-%s-%04d-%03d-%s" % (
-                    dict['group_acc'], dict['inst_cond'], dict['reg'],
-                    dict['num_train_batches'], dict['batch_size'], dict['lr']))
+            seed=dict['seed'], result_path=os.path.join(exp_dir, "results.csv")
         ) for dict in cond_dicts)
         _, mins, secs = elapsed_time(start_time)
         print("\nExperiment %s took %dm%ds to train\n\n" %

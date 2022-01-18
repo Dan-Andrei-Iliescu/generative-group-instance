@@ -24,7 +24,7 @@ def rec_error(test_x, x_rec):
     error = []
     for x, rec in zip(test_x, x_rec):
         error.append(np.mean((x - rec)**2))
-    return error
+    return np.mean(error)
 
 
 def trans_test(model, test_x, test_y):
@@ -67,62 +67,9 @@ def my_round(x):
         return x
 
 
-def moving_avg(a, n):
-    s = np.cumsum(a)
-    s[n:] = s[n:] - s[:-n]
-    a[n-1:] = s[n-1:] / n
-    return a
-
-
-def save_results(test_dict, result_dir):
-    df_dict = {}
-    cond_names = list(test_dict.keys())
-    for cond_name in cond_names:
-        conds = cond_name.split("-")
-        for idx in range(len(conds)):
-            if f"cond_{idx}" not in df_dict:
-                df_dict[f"cond_{idx}"] = [conds[idx]]
-            else:
-                df_dict[f"cond_{idx}"].append(conds[idx])
-
-        test_names = list(test_dict[cond_name].keys())
-        test_vals = []
-        for test_name in test_names:
-            epochs = list(test_dict[cond_name][test_name].keys())
-            error_mean = []
-            error_sdev = []
-            for epoch in epochs:
-                runs = test_dict[cond_name][test_name][epoch]
-                run_means = [np.mean(run) for run in runs]
-                error_mean.append(np.mean(run_means))
-                error_sdev.append(np.sqrt(np.mean(
-                    (np.mean(run_means) - run_means)**2)))
-
-            n = 20
-            dec = 1e+2
-            error_mean = dec * np.mean(np.array(error_mean)[-n:])
-            error_sdev = dec * np.mean(np.array(error_sdev)[-n:])
-
-            test_name_mean = test_name+"_mean"
-            test_name_sdev = test_name+"_sdev"
-            test_vals.append(test_name_mean)
-            test_vals.append(test_name_sdev)
-
-            if test_name_mean in df_dict:
-                df_dict[test_name_mean].append(error_mean)
-            else:
-                df_dict[test_name_mean] = [error_mean]
-
-            if test_name_sdev in df_dict:
-                df_dict[test_name_sdev].append(error_sdev)
-            else:
-                df_dict[test_name_sdev] = [error_sdev]
-
-    df = pd.DataFrame(data=df_dict)
+def save_results(df, result_dir):
+    df = df.loc[df['epoch'] >= 40]
+    df = df.groupby(by=['test_name', 'inst_cond', 'reg', 'group_acc'],
+                    dropna=False)['value'].mean()
     df.apply(my_round).to_csv(
-        os.path.join(result_dir, "table_results.csv"))
-
-    for idx in range(len(conds)):
-        agg_df = df.groupby([f"cond_{idx}"])[test_vals].mean()
-        agg_df.apply(my_round).to_csv(
-            os.path.join(result_dir, f"cond_{idx}.csv"))
+        os.path.join(result_dir, "final_results.csv"), index=False)

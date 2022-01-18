@@ -3,13 +3,14 @@ import json
 import os
 import time
 import numpy as np
+import pandas as pd
 
 from utils.helpers import prepare_data, trans_test, rec_test, latent_test, \
     rec_error, elapsed_time
 from utils.plots import plot_1D_trans
 from utils.toy_data import generate_dataset
 from src.model import Model
-from src.latent_pred import LatentPred
+from src.latent_pred import LatentPred, LatentPredMulti
 
 
 def train(
@@ -19,8 +20,10 @@ def train(
 
     # Path to save test results
     if result_path is None:
-        result_path = os.path.join("results", f"{group_acc}_{inst_cond}_{reg}")
-    result_prog_path = result_path + "_prog"
+        result_path = os.path.join("results", "results.csv")
+
+    # Model name
+    model_name = f"{inst_cond}_{reg}_{group_acc}"
 
     # Setup datasets
     train_data, test_a, test_b, test_ab = generate_dataset(
@@ -49,16 +52,17 @@ def train(
     model = Model(
         group_acc=group_acc, inst_cond=inst_cond, reg=reg, lr=lr)
     u_net = LatentPred(lr=lr, z_dim=2)
-    v_net = LatentPred(lr=lr, z_dim=1)
+    v_net = LatentPredMulti(lr=lr, v_dim=1, u_dim=2, h_dim=32)
 
     # training loop
+    dfs = []
     start_time = time.time()
     for epoch in range(num_epochs):
         for x, u, v in zip(train_x, train_u, train_v):
             model.step(prepare_data(x))
             u_inf, v_inf = model.inference(prepare_data(x))
             u_net.step(u_inf.detach(), prepare_data(u))
-            v_net.step(v_inf.detach(), prepare_data(v))
+            v_net.step(v_inf.detach(), prepare_data(u))
 
         # Testing
         result_name = result_path + f" @ epoch {epoch+1}"
@@ -66,12 +70,10 @@ def train(
         # Test reconstruction
         rec_batch = rec_test(model, test_a_x)
         rec_err = rec_error(test_a_x, rec_batch)
-        test_dict['rec_error'][epoch] = rec_err
 
         # Test translation
         trans_res = trans_test(model, test_a_x, test_b_x)
         trans_err = rec_error(test_ab_x, trans_res)
-        test_dict['trans_error'][epoch] = trans_err
 
         # Plot
         if (epoch+1) % test_freq == 0:
@@ -81,12 +83,7 @@ def train(
         # Test the accuracy of predicting the true latents from the inferred ones
         u_pred, v_pred = latent_test(model, u_net, v_net, test_a_x)
         u_error = rec_error(u_pred, test_a_u)
-        v_error = rec_error(v_pred, test_a_v)
-        # Ridiculous but necessary for the purpose of serialization
-        u_error = [float(x) for x in u_error]
-        v_error = [float(x) for x in v_error]
-        test_dict['u_error'][epoch] = u_error
-        test_dict['v_error'][epoch] = v_error
+        v_error = rec_error(v_pred, test_a_u)
 
         # Current time
         elapsed, mins, secs = elapsed_time(start_time)
@@ -100,38 +97,27 @@ def train(
               "\nGroup prediction error: %.4f, Instance prediction error: %.4f" %
               (np.mean(u_error), np.mean(v_error)))
 
-        # Save json file of test results
-        jsonString = json.dumps(test_dict)
-        with open(result_prog_path, "w") as jsonFile:
-            jsonFile.write(jsonString)
+        # Add these results to the dataframe
+        df = pd.DataFrame({
+            'test_name': ['rec_error', 'trans_error', 'u_error', 'v_error'],
+            'model_name': [model_name, model_name, model_name, model_name],
+            'inst_cond': [inst_cond, inst_cond, inst_cond, inst_cond],
+            'reg': [reg, reg, reg, reg],
+            'group_acc': [group_acc, group_acc, group_acc, group_acc],
+            'seed': [seed, seed, seed, seed],
+            'epoch': [epoch, epoch, epoch, epoch],
+            'value': [rec_err, trans_err, u_error, v_error]})
+        dfs.append(df)
 
-    # Add this run to the other runs
+    # Save dataframe of results
+    test_df = pd.DataFrame(columns=['test_name', 'model_name', 'inst_cond',
+                                    'reg', 'group_acc', 'seed', 'epoch',
+                                    'value'])
     if os.path.exists(result_path):
-        # Read test dict
-        fileObject = open(result_path, "r")
-        jsonContent = fileObject.read()
-        runs_dict = json.loads(jsonContent)
-    else:
-        runs_dict = {}
-    plot_names = list(test_dict.keys())
-    for plot_name in plot_names:
-        if plot_name not in runs_dict:
-            runs_dict[plot_name] = {}
-        for epoch in range(num_epochs):
-            if str(epoch) in runs_dict[plot_name]:
-                runs_dict[plot_name][str(epoch)].append(
-                    test_dict[plot_name][epoch])
-            else:
-                runs_dict[plot_name][epoch] = [test_dict[plot_name][epoch]]
-
-    # Save json file of test results
-    jsonString = json.dumps(runs_dict)
-    with open(result_path, "w") as jsonFile:
-        jsonFile.write(jsonString)
-
-    # Remove progress file
-    if os.path.exists(result_prog_path):
-        os.remove(result_prog_path)
+        test_df = pd.read_csv(result_path)
+    for df in dfs:
+        test_df = pd.concat([test_df, df])
+    test_df.to_csv(result_path, index=False)
 
 
 if __name__ == '__main__':
