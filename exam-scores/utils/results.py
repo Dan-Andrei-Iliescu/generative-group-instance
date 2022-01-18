@@ -3,11 +3,11 @@ import fire
 import json
 import os
 
-from utils.plots import plot_results
+from utils.plots import violin_plot as plot
 from utils.helpers import save_results
 
 
-def results(result_dir="results"):
+def results(result_dir="results", palette=None):
     file_list = sorted(glob.glob(os.path.join(result_dir, "*")))
     test_dict = {}
     for file_path in file_list:
@@ -22,7 +22,7 @@ def results(result_dir="results"):
         except:
             print("Not json")
 
-    plot_results(test_dict, result_dir)
+    plot(test_dict, result_dir, palette)
     save_results(test_dict, result_dir)
 
 

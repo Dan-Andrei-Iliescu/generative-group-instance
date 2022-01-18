@@ -2,24 +2,38 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 import os
+import time
 
 NUM_GROUPS_PER_PLOT = 16
-FIG_SIZE = 1200
-BIG_FIG_SIZE = 1400
+FIG_SIZE = 800
+BIG_FIG_SIZE = 1000
 
 
-def compute_colours():
+def compute_colours(palette=None):
     # colours
     alphas = [1., 0.3]
     colours = []
     for alpha in alphas:
-        colours.append([f'rgba(255, 190, 11, {alpha})',
-                        f'rgba(251, 86, 7, {alpha})',
-                        f'rgba(202, 0, 87, {alpha})',
-                        f'rgba(131, 56, 236, {alpha})',
-                        f'rgba(58, 134, 255, {alpha})',
-                        f'rgba(70, 190, 190, {alpha})',
-                        f'rgba(119, 191, 25, {alpha})'])
+        if palette == "results":
+            colours.append([f'rgba(200, 85, 61, {alpha})',
+                            f'rgba(45, 48, 71, {alpha})',
+                            f'rgba(45, 48, 71, {alpha})',
+                            f'rgba(45, 48, 71, {alpha})'])
+        elif palette == "ablation":
+            colours.append([f'rgba(147, 183, 190, {alpha})',
+                            f'rgba(45, 48, 71, {alpha})',
+                            f'rgba(45, 48, 71, {alpha})',
+                            f'rgba(200, 85, 61, {alpha})',
+                            f'rgba(88, 139, 139, {alpha})',
+                            f'rgba(88, 139, 139, {alpha})'])
+        else:
+            colours.append([f'rgba(255, 190, 11, {alpha})',
+                            f'rgba(251, 86, 7, {alpha})',
+                            f'rgba(202, 0, 87, {alpha})',
+                            f'rgba(131, 56, 236, {alpha})',
+                            f'rgba(58, 134, 255, {alpha})',
+                            f'rgba(70, 190, 190, {alpha})',
+                            f'rgba(119, 191, 25, {alpha})'])
     return colours
 
 
@@ -218,7 +232,7 @@ def moving_avg(a, n):
     return a
 
 
-def plot_results(test_dict, result_dir):
+def plot_results(test_dict, result_dir, palette):
     fig = make_subplots(
         rows=2, cols=2, shared_xaxes=True,
         row_heights=[0.5, 0.5],
@@ -294,3 +308,68 @@ def plot_results(test_dict, result_dir):
         x=1
     ))
     fig.write_image(os.path.join(result_dir, "results.svg"))
+
+
+def violin_plot(test_dict, result_dir, palette):
+    titles = ["a) Reconstruction Error", "b) Translation Error",
+              "c) U Prediction Error",
+              "d) V Prediction Error"]
+    fig = make_subplots(
+        rows=1, cols=4,
+        subplot_titles=titles,
+        vertical_spacing=0.05, horizontal_spacing=0.05)
+    colours = compute_colours(palette)
+
+    cond_names = list(test_dict.keys())
+    for idx in range(len(cond_names)):
+        cond_name = cond_names[idx]
+        test_names = list(test_dict[cond_name].keys())
+        rows = [1, 1, 1, 1]
+        cols = [1, 2, 3, 4]
+
+        is_showlegend = False
+        for test_name, row, col in zip(test_names, rows, cols):
+            epochs = list(test_dict[cond_name][test_name].keys())
+            errors = []
+            n = 20
+            for epoch in epochs[-n:]:
+                runs = test_dict[cond_name][test_name][epoch]
+                for run in runs:
+                    errors.append(np.log(np.mean(run)))
+            errors = np.array(errors)
+
+            fig.add_trace(go.Box(
+                y=errors,
+                marker=dict(color=colours[0][idx % len(colours[0])]),
+                name=idx+1,
+                legendgroup=idx+1,
+                showlegend=is_showlegend,
+                notched=True
+            ), row=row, col=col)
+            is_showlegend = False
+
+    fig.update_yaxes(title_text='Error (log MSE)', col=1)
+    fig.update_xaxes(title_text="Model", row=1)
+    fig.update_layout(
+        legend_title="Models",
+        width=BIG_FIG_SIZE,
+        height=FIG_SIZE,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+    fig.update_layout(legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=-0.1,
+        xanchor="right",
+        x=1
+    ))
+    fig['layout'].update(margin=dict(l=0, r=0, b=0))
+    fig.update_xaxes(showline=True, linewidth=1,
+                     linecolor='black', mirror=True)
+    fig.update_yaxes(showline=True, linewidth=1, gridcolor='lightgrey',
+                     linecolor='black', mirror=True)
+
+    fig.write_image(os.path.join(result_dir, "results.pdf"))
+    time.sleep(2)
+    fig.write_image(os.path.join(result_dir, "results.pdf"))
