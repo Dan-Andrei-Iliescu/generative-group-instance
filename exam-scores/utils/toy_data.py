@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from utils.plots import plot_1D_data, plot_1D_trans
+from utils.plots import plot_data, plot_trans
 from utils.helpers import elapsed_time
 
 
@@ -86,6 +86,5 @@ def generate_dataset(
 
 if __name__ == '__main__':
     train_data, test_a, test_b, test_ab = generate_dataset()
-    plot_1D_data(test_a[0][0], "Data", "results/data")
-    plot_1D_trans(
-        test_a[0][0], test_b[0][0], test_ab[0][0], "Data", "results/data")
+    plot_data(test_a[0][0], "results/data")
+    plot_trans(test_a[0][0], test_b[0][0], test_ab[0][0], "results/data")

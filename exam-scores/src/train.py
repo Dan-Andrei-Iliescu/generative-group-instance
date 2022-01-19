@@ -7,7 +7,7 @@ import pandas as pd
 
 from utils.helpers import prepare_data, trans_test, rec_test, latent_test, \
     rec_error, elapsed_time
-from utils.plots import plot_1D_trans
+from utils.plots import plot_trans
 from utils.toy_data import generate_dataset
 from src.model import Model
 from src.latent_pred import LatentPred, LatentPredMulti
@@ -16,14 +16,12 @@ from src.latent_pred import LatentPred, LatentPredMulti
 def train(
         group_acc=None, inst_cond=True, reg=None,
         num_train_batches=1024, batch_size=64, num_test_batches=128,
-        num_epochs=64, test_freq=16, lr=1e-4, result_path=None, seed=2):
+        num_epochs=64, test_freq=16, lr=1e-4, result_path="results", seed=2):
 
     # Path to save test results
-    if result_path is None:
-        result_path = os.path.join("results", "results.csv")
-
-    # Model name
+    result_csv = os.path.join(result_path, "results.csv")
     model_name = f"{inst_cond}_{reg}_{group_acc}"
+    result_name = os.path.join(result_path, model_name)
 
     # Setup datasets
     train_data, test_a, test_b, test_ab = generate_dataset(
@@ -36,7 +34,6 @@ def train(
 
     test_a_x = test_a[0]
     test_a_u = test_a[1]
-    test_a_v = test_a[2]
 
     test_b_x = test_b[0]
     test_ab_x = test_ab[0]
@@ -65,7 +62,7 @@ def train(
             v_net.step(v_inf.detach(), prepare_data(u))
 
         # Testing
-        result_name = result_path + f" @ epoch {epoch+1}"
+        result_disp = result_name + f" @ epoch {epoch+1}"
 
         # Test reconstruction
         rec_batch = rec_test(model, test_a_x)
@@ -77,8 +74,7 @@ def train(
 
         # Plot
         if (epoch+1) % test_freq == 0:
-            plot_1D_trans(test_a_x[0], test_b_x[0], trans_res[0],
-                          result_name, result_path)
+            plot_trans(test_a_x[0], test_b_x[0], trans_res[0], result_name)
 
         # Test the accuracy of predicting the true latents from the inferred ones
         u_pred, v_pred = latent_test(model, u_net, v_net, test_a_x)
@@ -89,7 +85,7 @@ def train(
         elapsed, mins, secs = elapsed_time(start_time)
         per_epoch = elapsed / (epoch + 1)
         print("> Training [%s / %d] took %dm%ds, %.1fs/epoch" %
-              (result_name, num_epochs, mins, secs, per_epoch) +
+              (result_disp, num_epochs, mins, secs, per_epoch) +
               "\nReconstruction error: %.4f" %
               (np.mean(rec_err)) +
               "\nTranslation error: %.4f" %
@@ -113,11 +109,11 @@ def train(
     test_df = pd.DataFrame(columns=['test_name', 'model_name', 'inst_cond',
                                     'reg', 'group_acc', 'seed', 'epoch',
                                     'value'])
-    if os.path.exists(result_path):
-        test_df = pd.read_csv(result_path)
+    if os.path.exists(result_csv):
+        test_df = pd.read_csv(result_csv)
     for df in dfs:
         test_df = pd.concat([test_df, df])
-    test_df.to_csv(result_path, index=False)
+    test_df.to_csv(result_csv, index=False)
 
 
 if __name__ == '__main__':

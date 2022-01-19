@@ -118,7 +118,7 @@ def exp(result_dir="results", exp_name=None, training=True):
             group_acc=dict['group_acc'], inst_cond=dict['inst_cond'],
             reg=dict['reg'], num_train_batches=dict['num_train_batches'],
             batch_size=dict['batch_size'], lr=0.1**dict['lr'],
-            seed=dict['seed'], result_path=os.path.join(exp_dir, "results.csv")
+            seed=dict['seed'], result_path=exp_dir
         ) for dict in cond_dicts)
         _, mins, secs = elapsed_time(start_time)
         print("\nExperiment %s took %dm%ds to train\n\n" %

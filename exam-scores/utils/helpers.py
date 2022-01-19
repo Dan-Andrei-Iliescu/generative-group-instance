@@ -58,18 +58,3 @@ def elapsed_time(start_time):
     mins = elapsed / 60
     secs = elapsed % 60
     return elapsed, mins, secs
-
-
-def my_round(x):
-    try:
-        return np.around(x, decimals=1)
-    except:
-        return x
-
-
-def save_results(df, result_dir):
-    df = df.loc[df['epoch'] >= 40]
-    df = df.groupby(by=['test_name', 'inst_cond', 'reg', 'group_acc'],
-                    dropna=False)['value'].mean()
-    df.apply(my_round).to_csv(
-        os.path.join(result_dir, "final_results.csv"), index=False)
