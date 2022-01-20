@@ -5,7 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 
-from utils.plots import plot_results as plot
+from utils.plots import plot_results, plot_confounded
 
 
 def my_round(x):
@@ -27,8 +27,8 @@ def results(result_dir="results", skip=44):
     result_path = os.path.join(result_dir, "results.csv")
     test_df = pd.read_csv(result_path)
 
-    plot(test_df, result_dir, skip)
-    save_results(test_df, result_dir, skip)
+    # plot_results(test_df, result_dir, skip)
+    plot_confounded(test_df, result_dir, skip)
 
 
 if __name__ == '__main__':

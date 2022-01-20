@@ -1,5 +1,4 @@
 import fire
-import json
 import os
 import time
 import numpy as np
@@ -16,17 +15,18 @@ from src.latent_pred import LatentPred, LatentPredMulti
 def train(
         group_acc=None, inst_cond=True, reg=None,
         num_train_batches=1024, batch_size=64, num_test_batches=128,
-        num_epochs=64, test_freq=16, lr=1e-4, result_path="results", seed=2):
+        num_epochs=64, test_freq=16, lr=1e-4, result_path="results",
+        seed=2, uv_ratio=None):
 
     # Path to save test results
     result_csv = os.path.join(result_path, "results.csv")
-    model_name = f"{inst_cond}_{reg}_{group_acc}"
+    model_name = f"{inst_cond}_{reg}_{group_acc}_{uv_ratio}"
     result_name = os.path.join(result_path, model_name)
 
     # Setup datasets
     train_data, test_a, test_b, test_ab = generate_dataset(
         num_train_batches=num_train_batches, num_test_batches=num_test_batches,
-        batch_size=batch_size, seed=seed)
+        batch_size=batch_size, seed=seed, uv_ratio=uv_ratio)
 
     train_x = train_data[0]
     train_u = train_data[1]
@@ -100,6 +100,7 @@ def train(
             'inst_cond': [inst_cond, inst_cond, inst_cond, inst_cond],
             'reg': [reg, reg, reg, reg],
             'group_acc': [group_acc, group_acc, group_acc, group_acc],
+            'uv_ratio': [uv_ratio, uv_ratio, uv_ratio, uv_ratio],
             'seed': [seed, seed, seed, seed],
             'epoch': [epoch, epoch, epoch, epoch],
             'value': [rec_err, trans_err, u_error, v_error]})
@@ -107,12 +108,13 @@ def train(
 
     # Save dataframe of results
     test_df = pd.DataFrame(columns=['test_name', 'model_name', 'inst_cond',
-                                    'reg', 'group_acc', 'seed', 'epoch',
-                                    'value'])
-    if os.path.exists(result_csv):
-        test_df = pd.read_csv(result_csv)
+                                    'reg', 'group_acc', 'uv_ratio', 'seed',
+                                    'epoch', 'value'])
     for df in dfs:
         test_df = pd.concat([test_df, df])
+    if os.path.exists(result_csv):
+        read_df = pd.read_csv(result_csv, engine='python')
+        test_df = pd.concat([read_df, test_df])
     test_df.to_csv(result_csv, index=False)
 
 
