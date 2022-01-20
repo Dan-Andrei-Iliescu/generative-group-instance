@@ -5,7 +5,7 @@
 % Recommended, but optional, packages for figures and better typesetting:
 \usepackage{microtype}
 \usepackage{graphicx}
-\usepackage{subfigure}
+\usepackage{subcaption}
 \usepackage{booktabs} % for professional tables
 
 % hyperref makes hyperlinks in the resulting PDF.
@@ -55,12 +55,12 @@
 
 % The \icmltitle you define below is probably too long as a header.
 % Therefore, a short form for the running title is supplied here:
-\icmltitlerunning{Disentangling Emergent Groups}
+\icmltitlerunning{Disentangling Confounded Groups}
 
 \begin{document}
 
 \twocolumn[
-\icmltitle{Disentangling Emergent Groups}
+\icmltitle{Disentangling Confounded Groups}
 
 % It is OKAY to include author information, even for blind
 % submissions: the style file will automatically remove it for you
@@ -115,14 +115,14 @@ Group-instance disentanglement is the problem of learning separate representatio
 \begin{figure}[t]
     \vskip 0.2in
     \begin{center}
-    \centerline{\includegraphics[width=\columnwidth]{files/bayes_net.pdf}}
-    \caption{Probabilistic graphical model of the VAE (left) and the GVAE (right). The dotted arrows depict the variational latent posterior. \textbf{The blue arrow shows a dependency which is absent from existing methods but present in our proposed model.}}
+    \centerline{\includegraphics[width=0.7\columnwidth]{files/bayes_net_one.pdf}}
+    \caption{Probabilistic graphical model of the Group Variational Autoencoder.  $u$ are group variables and $v$ are instance variables. The conditional $q(v_{ik} | u_i)$ (shown in blue) is absent from the existing literature but present in our proposed model. This enables our model to accurately infer the instance variable even when the groups are confounded. }
     \label{bayes-net}
     \end{center}
     \vskip -0.2in
 \end{figure}
 
-The goal of group-instance disentanglement is to learn a representation network that transforms grouped observations (e.g. images grouped by author,  temperature readings grouped by weather station,  etc) into two latent variables,  \textit{group} and \textit{instance}.  The group variable should capture the information which distinguishes one group from another, but exclude the information which can identify a particular observation within the group. The instance variable should do vice-versa: capture all of the individual information, but none of the group information.
+Group-instance disentanglement is the task of learning a representation network $r(\mathbf{x})$ which transforms a group of observations $\mathbf{x} = \{x_1, ..., x_K\}$ (e.g. images grouped by author,  temperature readings grouped by weather station,  etc) into a \textit{group} code $u$ and a set of \textit{instance} codes $\mathbf{z} = \{z_1, ..., z_K\}$. The goal is that the group code should capture all the information that distinguishes one group from another,  while the instance code should capture all the information that distinguishes the observations within a group, but none of the group information.
 
 All the current state-of-the-art approaches to group-instance disentanglement \citep{Bouchacourt2018MultiLevelVA,Hosoya2019GroupbasedLO,Shu2020Weakly, Chen2020WeaklySD,Locatello2020WeaklySupervisedDW} follow the Variational Autoencoder framework \citep{Kingma2014AutoEncodingVB,JimenezRezende2014StochasticBA} whereby a generative model mapping latent variables (group and instance) to data observations is trained using variational inference. We call this family of models the Group Variational Autoencoder (GVAE). These methods vary in how they define the variational latent posterior and any additional regularization objectives they might have.
 
@@ -298,16 +298,6 @@ We estimate the density $\mathrm{Pr}_{U^t | U^q}$ by training a regression netwo
 
 \subsection{Unsupervised Translation}
 
-\begin{figure}[ht]
-    \vskip 0.2in
-    \begin{center}
-    \centerline{\includegraphics[width=\columnwidth]{files/data_trans.pdf}}
-    \caption{\textbf{Example of translation on the Exam-Scores dataset.} The yellow and orange show the distributions of the source and target group, respectively. The red shows the distribution of the translated group. The grey lines show the translation of individual observations from the source to the target. We expect a good translation to have the translation lines uncrossed (the instance variable is preserved) and to have the same distribution as the target group (the group variable is changed).}
-    \label{trans}
-    \end{center}
-    \vskip -0.2in
-\end{figure}
-
 Unsupervised translation is the process of transforming an observation by changing its group code while keeping its instance code fixed. This is a common downstream task for disentangled representations because it requires a clean separation between the group and instance representations \citep{Tenenbaum2000SeparatingSA}. Therefore, it can be used to quantify the quality of disentanglement.
 
 Formally, let $i, j$ be the indices of the source and target group, respectively. Translation involves sampling a group of instance codes from the source group $q(\mathbf{v}_i | \mathbf{x}_i)$ and a group code from the target group $q(u_j | \mathbf{x}_j)$. Then, we generate the translated observations by combining each instance code with the group code $p(x'_{k} | u_j, \mathbf{v}_j)$.
@@ -319,8 +309,17 @@ We measure translation quality by taking the mean-squared error between the tran
 \begin{figure}[ht]
     \vskip 0.2in
     \begin{center}
-    \centerline{\includegraphics[width=\columnwidth]{files/ours.pdf}}
-    \centerline{\includegraphics[width=\columnwidth]{files/theirs.pdf}}
+\begin{subfigure}{0.49\columnwidth}
+    \includegraphics[width=\textwidth]{files/data_trans.pdf}
+    \caption{CxVAE}
+    \label{fig:first}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.49\columnwidth}
+    \includegraphics[width=\textwidth]{files/data_trans.pdf}
+    \caption{ML-VAE}
+    \label{fig:second}
+\end{subfigure}
     \caption{Qualitative comparison of unsupervised translation between CxVAE (top) and ML-VAE \citep{Bouchacourt2018MultiLevelVA} (bottom). Our model captures the distribution of values in the target group better than the existing methods.}
     \label{qualitative}
     \end{center}
@@ -331,74 +330,43 @@ We test CxVAE against the other models from the GVAE family.
 
 \subsection{Quantitative Evaluation}
 
-\begin{figure}[ht]
-    \vskip 0.2in
-    \begin{center}
-    \centerline{\includegraphics[width=\columnwidth]{files/results.pdf}}
-    \caption{\textbf{Errors on the holdout set by training epoch.} We compare CxVAE (ours, yellow) with \citet{Bouchacourt2018MultiLevelVA} (purple), \citet{Hosoya2019GroupbasedLO} (orange), and
-    \citet{Nmeth2020AdversarialDW} (red). For each model we perform 7 training runs, displaying the lowest, highest, and median error at each epoch.}
-    \label{results}
-    \end{center}
-    \vskip -0.2in
+\begin{figure}[t]
+\vskip 0.2in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{files/results.pdf}}
+\caption{Our CxVAE produces significant improvements over the state-of-the-art in every disentanglement metric considered: holdout reconstruction error (\textbf{lower is better}), translation error (\textbf{lower is better}), $U$-probing (\textbf{lower is better}) and $V$-probing (\textbf{higher is better}).  We show box-plots for the distribution of scores over 100 random initialisations. }
+\label{results}
+\end{center}
+\vskip -0.2in
 \end{figure}
-
-
-\begin{table*}[t]
-    \caption{\textbf{Comparison between errors on the holdout set of our model (CxVAE) and the rest of the GVAE family.} CxVAE has the best performance across the 4 criteria. All errors are MSE, so lower is better. A mean error and standard deviation over the 7 training runs is taken at every epoch, and then the last 20 training epochs (44 - 64) are averaged in order to be displayed.}
-    \label{results}
-    \vskip 0.15in
-    \begin{center}
-    \begin{small}
-    \begin{sc}
-    \begin{tabular}{lcccc}
-    \toprule
-    Model & Rec Err & Trans Err & $u$-pred Err & $v$-pred Err \\
-    \midrule
-    CxVAE (ours) & \textbf{52.1} $\pm$ 0.6 & \textbf{219.5} $\pm$ 4.7 & \textbf{53.3} $\pm$ 1.2 & \textbf{30.2} $\pm$ 0.3 \\
-    ML-VAE \citep{Bouchacourt2018MultiLevelVA} & 69.8 $\pm$ 1.6 & 738.8 $\pm$ 13.6  & 63.4 $\pm$ 1.0 & 63.0 $\pm$ 0.3 \\
-    GVAE \citep{Hosoya2019GroupbasedLO} & 71.9 $\pm$ 4.3 & 742.9 $\pm$ 14.4 & 63.1 $\pm$ 0.9 & 63.0 $\pm$ 0.4 \\
-    GVAE + Reg \citep{Nmeth2020AdversarialDW} & 70.0 $\pm$ 1.4 & 735.3 $\pm$ 13.0 & 63.8 $\pm$ 1.1 & 63.0 $\pm$ 0.5 \\
-    \bottomrule
-    \end{tabular}
-    \end{sc}
-    \end{small}
-    \end{center}
-    \vskip -0.1in
-\end{table*}
 
 \subsection{Ablation Study}
 
-\begin{table*}[t]
-    \caption{\textbf{Ablation study comparing CxVAE (our model) with alternative models obtained by replacing each of the novel components (group encoder, instance encoder and regularization).} Each replacement leads to a worse performance across all criteria.}
-    \label{ablation}
-    \vskip 0.15in
-    \begin{center}
-    \begin{small}
-    \begin{sc}
-    \begin{tabular}{lcccc}
-    \toprule
-    Model & Rec Err & Trans Err & $u$-pred Err & $v$-pred Err \\
-    \midrule
-    CxVAE (ours) & \textbf{52.1} $\pm$ 0.6 & \textbf{219.5} $\pm$ 4.7 & \textbf{53.3} $\pm$ 1.2 & \textbf{30.2} $\pm$ 0.3 \\ 
-    \midrule \multicolumn{5}{c}{$u$ Encoder} \\ \midrule
-    Average & 53.6 $\pm$ 2.2 & 224.7 $\pm$ 10.0 & 53.4 $\pm$ 1.1 & 30.9 $\pm$ 1.1 \\
-    Multiplication & 54.9 $\pm$ 2.8 & 229.2 $\pm$ 7.8 & 53.4 $\pm$ 0.9 & 31.4 $\pm$ 1.0 \\ 
-    \midrule \multicolumn{5}{c}{$v$ Encoder} \\ \midrule
-    Unconditional & 72.3 $\pm$ 3.6 & 729.0 $\pm$ 15.1 & 63.6 $\pm$ 1.2 & 63.0 $\pm$ 0.3 \\
-    \midrule \multicolumn{5}{c}{Regularization} \\ \midrule
-    None & 54.1 $\pm$ 1.9 & 235.5 $\pm$ 16.5 & 53.6 $\pm$ 1.4 & 31.6 $\pm$ 1.5 \\
-    Unconditional IB & 53.7 $\pm$ 1.2 & 225.7 $\pm$ 5.7 & 53.5 $\pm$ 1.1 & 30.8 $\pm$ 0.6 \\
-    \bottomrule
-    \end{tabular}
-    \end{sc}
-    \end{small}
-    \end{center}
-    \vskip -0.1in
-\end{table*}
+\begin{figure}[t]
+\vskip 0.2in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{files/ablation.pdf}}
+\caption{\textbf{Ablation study.} Replacing any novel component of our CxVAE with an existing alternative leads to worse performance. Note that the largest reduction in performance is brought by making the instance encoder unconditional. The next is changing the regularization, followed by using a less expressive group encoder.}
+\label{ablation}
+\end{center}
+\vskip -0.2in
+\end{figure}
 
 In order to quantify the effect of each proposed improvement, we perform an ablation study whereby we measure the decrease in performance resulting from replacing a proposed element of our model with a current alternative.
 
 The proposed improvements have the best individual performance with respect to both reconstruction and translation error in each of the three categories. The choice of a group-aware instance encoder leads to the most significant increase in performance.
+
+\subsection{Relative strength of the group and instance components}
+
+\begin{figure*}[t]
+\vskip 0.2in
+\begin{center}
+\centerline{\includegraphics[width=\textwidth]{files/uv_ratio.pdf}}
+\caption{\textbf{Ablation study.} Replacing any novel component of our CxVAE with an existing alternative leads to worse performance. Note that the largest reduction in performance is brought by making the instance encoder unconditional. The next is changing the regularization, followed by using a less expressive group encoder.}
+\label{ablation}
+\end{center}
+\vskip -0.2in
+\end{figure*}
 
 \bibliography{main}
 \bibliographystyle{icml2022}
