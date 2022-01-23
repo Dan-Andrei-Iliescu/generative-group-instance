@@ -5,7 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 
-from utils.plots import plot_results, plot_confounded
+from utils.plots import plot_results, plot_uv_ratio, plot_xy_ratio
 
 
 def my_round(x):
@@ -27,8 +27,9 @@ def results(result_dir="results", skip=44):
     result_path = os.path.join(result_dir, "results.csv")
     test_df = pd.read_csv(result_path)
 
-    # plot_results(test_df, result_dir, skip)
-    plot_confounded(test_df, result_dir, skip)
+    plot_results(test_df, result_dir, skip)
+    plot_uv_ratio(test_df, result_dir, skip)
+    plot_xy_ratio(test_df, result_dir, skip)
 
 
 if __name__ == '__main__':

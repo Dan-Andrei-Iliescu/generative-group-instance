@@ -15,13 +15,13 @@ from src.latent_pred import LatentPred, LatentPredMulti
 def train(
         group_acc=None, inst_cond=True, reg=None,
         num_train_batches=1024, batch_size=64, num_test_batches=128,
-        num_epochs=64, test_freq=16, lr=1e-4, result_path="results",
-        seed=2, uv_ratio=None):
+        num_epochs=4, test_freq=16, lr=1e-4, result_path="results",
+        seed=2, uv_ratio=0.5, xy_ratio=1.):
 
     # Path to save test results
     result_csv = os.path.join(result_path, "results.csv")
-    model_name = f"{inst_cond}_{reg}_{group_acc}_{uv_ratio}"
-    result_name = os.path.join(result_path, model_name)
+    model_name = f"{inst_cond}_{reg}_{group_acc}"
+    result_name = os.path.join(result_path, model_name + f"_{seed}")
 
     # Setup datasets
     train_data, test_a, test_b, test_ab = generate_dataset(
@@ -47,15 +47,16 @@ def train(
 
     # Setup the models
     model = Model(
-        group_acc=group_acc, inst_cond=inst_cond, reg=reg, lr=lr)
+        group_acc=group_acc, inst_cond=inst_cond, reg=reg, uv_ratio=uv_ratio,
+        xy_ratio=xy_ratio, lr=lr)
     u_net = LatentPred(lr=lr, z_dim=2)
-    v_net = LatentPredMulti(lr=lr, v_dim=1, u_dim=2, h_dim=32)
+    v_net = LatentPredMulti(lr=lr, v_dim=2, u_dim=2, h_dim=32)
 
     # training loop
     dfs = []
     start_time = time.time()
     for epoch in range(num_epochs):
-        for x, u, v in zip(train_x, train_u, train_v):
+        for x, u, _ in zip(train_x, train_u, train_v):
             model.step(prepare_data(x))
             u_inf, v_inf = model.inference(prepare_data(x))
             u_net.step(u_inf.detach(), prepare_data(u))
@@ -101,6 +102,7 @@ def train(
             'reg': [reg, reg, reg, reg],
             'group_acc': [group_acc, group_acc, group_acc, group_acc],
             'uv_ratio': [uv_ratio, uv_ratio, uv_ratio, uv_ratio],
+            'xy_ratio': [xy_ratio, xy_ratio, xy_ratio, xy_ratio],
             'seed': [seed, seed, seed, seed],
             'epoch': [epoch, epoch, epoch, epoch],
             'value': [rec_err, trans_err, u_error, v_error]})
@@ -108,8 +110,8 @@ def train(
 
     # Save dataframe of results
     test_df = pd.DataFrame(columns=['test_name', 'model_name', 'inst_cond',
-                                    'reg', 'group_acc', 'uv_ratio', 'seed',
-                                    'epoch', 'value'])
+                                    'reg', 'group_acc', 'uv_ratio', 'xy_ratio',
+                                    'seed', 'epoch', 'value'])
     for df in dfs:
         test_df = pd.concat([test_df, df])
     if os.path.exists(result_csv):

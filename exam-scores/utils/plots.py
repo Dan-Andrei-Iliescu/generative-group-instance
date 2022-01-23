@@ -60,7 +60,7 @@ def name_assign(model_name):
         'True_ours_med': 'E',
         'False_None_mul': 'ML-VAE',
         'False_None_med': 'GVAE',
-        'False_nemeth_med': 'GVAE+Reg',
+        'False_nemeth_med': 'GVAE-AD',
         'True': 'CxVAE',
         'False': 'GVAE'
     }
@@ -259,7 +259,7 @@ def plot_results(df, result_dir, skip):
     fig.write_image(os.path.join(result_dir, "results.pdf"))
 
 
-def plot_confounded(df, result_dir, skip):
+def plot_uv_ratio(df, result_dir, skip):
     titles = ['a) Reconstruction', "b) Translation",
               "c) U Probing",
               "d) V Probing"]
@@ -271,6 +271,7 @@ def plot_confounded(df, result_dir, skip):
     df = df.loc[df['epoch'] > skip]
 
     model_names = pd.unique(df['model_name'])
+    uv_ratios = pd.unique(df['uv_ratio'])
 
     rows = [1, 1, 1, 1]
     cols = [1, 2, 3, 4]
@@ -280,24 +281,25 @@ def plot_confounded(df, result_dir, skip):
         test_df = df.loc[df['test_name'] == test_names[plt_idx]]
         ascending = False if plt_idx == 3 else True
         group_df = test_df.groupby([
-            'model_name'
-        ])[['value', 'uv_ratio', 'inst_cond']].mean().reset_index()\
+            'model_name', 'uv_ratio'
+        ])[['value', 'inst_cond']].mean().reset_index()\
             .sort_values(by=['value'], ascending=ascending)
-        model_names = group_df['model_name']
         for model_name in model_names:
-            model_df = test_df.loc[test_df['model_name'] == model_name]
-            name = str(model_df['inst_cond'].values[0])
-            fig.add_trace(go.Box(
-                x=model_df['uv_ratio'],
-                y=model_df['value'],
-                notched=False, boxpoints=False,
-                boxmean=True,
-                marker_color=colour_assign(group_assign(name)),
-                name=name_assign(name),
-                legendgroup=group_assign(name),
-                showlegend=(group_assign(name) not in seen)
-            ), row=rows[plt_idx], col=cols[plt_idx])
-            seen.append(group_assign(name))
+            for uv_ratio in uv_ratios:
+                model_df = test_df.loc[test_df['model_name'] == model_name]
+                name = str(model_df['inst_cond'].values[0])
+                model_df = model_df.loc[model_df['uv_ratio'] == uv_ratio]
+                fig.add_trace(go.Box(
+                    x=model_df['uv_ratio'],
+                    y=model_df['value'],
+                    notched=False, boxpoints=False,
+                    boxmean=True,
+                    marker_color=colour_assign(group_assign(name)),
+                    name=name_assign(name),
+                    legendgroup=group_assign(name),
+                    showlegend=(group_assign(name) not in seen)
+                ), row=rows[plt_idx], col=cols[plt_idx])
+                seen.append(group_assign(name))
         temp_df = group_df.loc[group_df['inst_cond'] == True].sort_values(
             by=['uv_ratio'], ascending=ascending)
         fig.add_trace(go.Scatter(
@@ -349,7 +351,103 @@ def plot_confounded(df, result_dir, skip):
             tickvals=[0.01, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 0.99]
         )
     )
-
-    fig.write_image(os.path.join(result_dir, "results.pdf"))
+    fig.write_image(os.path.join(result_dir, "uv_ratio.pdf"))
     time.sleep(2)
-    fig.write_image(os.path.join(result_dir, "results.pdf"))
+    fig.write_image(os.path.join(result_dir, "uv_ratio.pdf"))
+
+
+def plot_xy_ratio(df, result_dir, skip):
+    titles = ['a) Reconstruction', "b) Translation",
+              "c) U Probing",
+              "d) V Probing"]
+    fig = make_subplots(
+        rows=1, cols=4,
+        subplot_titles=titles,
+        vertical_spacing=0.05, horizontal_spacing=0.03)
+
+    df = df.loc[df['epoch'] > skip]
+
+    model_names = pd.unique(df['model_name'])
+    xy_ratios = pd.unique(df['xy_ratio'])
+
+    rows = [1, 1, 1, 1]
+    cols = [1, 2, 3, 4]
+    test_names = ['rec_error', 'trans_error', 'u_error', 'v_error']
+    seen = []
+    for plt_idx in range(4):
+        test_df = df.loc[df['test_name'] == test_names[plt_idx]]
+        ascending = False if plt_idx == 3 else True
+        group_df = test_df.groupby([
+            'model_name', 'xy_ratio'
+        ])[['value', 'inst_cond']].mean().reset_index()\
+            .sort_values(by=['value'], ascending=ascending)
+        for model_name in model_names:
+            for xy_ratio in xy_ratios:
+                model_df = test_df.loc[test_df['model_name'] == model_name]
+                name = str(model_df['inst_cond'].values[0])
+                model_df = model_df.loc[model_df['xy_ratio'] == xy_ratio]
+                fig.add_trace(go.Box(
+                    x=model_df['xy_ratio'],
+                    y=model_df['value'],
+                    notched=False, boxpoints=False,
+                    boxmean=True,
+                    marker_color=colour_assign(group_assign(name)),
+                    name=name_assign(name),
+                    legendgroup=group_assign(name),
+                    showlegend=(group_assign(name) not in seen)
+                ), row=rows[plt_idx], col=cols[plt_idx])
+                seen.append(group_assign(name))
+        temp_df = group_df.loc[group_df['inst_cond'] == True].sort_values(
+            by=['xy_ratio'], ascending=ascending)
+        fig.add_trace(go.Scatter(
+            x=temp_df['xy_ratio'],
+            y=temp_df['value'],
+            mode='lines+markers',
+            marker_color=colour_assign(group_assign('True')),
+            name='Mean over 100 runs',
+            showlegend=False
+        ), row=rows[plt_idx], col=cols[plt_idx])
+        seen.append("green")
+        temp_df = group_df.loc[group_df['inst_cond'] == False].sort_values(
+            by=['xy_ratio'], ascending=ascending)
+        fig.add_trace(go.Scatter(
+            x=temp_df['xy_ratio'],
+            y=temp_df['value'],
+            mode='lines+markers',
+            marker_color=colour_assign(group_assign('False')),
+            name='Mean over 100 runs',
+            showlegend=False
+        ), row=rows[plt_idx], col=cols[plt_idx])
+
+    fig.update_yaxes(title_text='Error (MSE)', col=1)
+    fig.update_xaxes(
+        title_text='Ratio of strength between U and V in the generation of the exam-score dataset', col=2)
+    fig.update_xaxes(
+        tickvals=[0.01, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 0.99])
+    fig.update_layout(
+        width=2*BIG_FIG_SIZE,
+        height=BIG_FIG_SIZE,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+    fig.update_layout(legend=dict(
+        orientation="h",
+        yanchor="top",
+        y=1.12,
+        xanchor="left",
+        x=0
+    ))
+    fig['layout'].update(margin=dict(l=0, r=0, b=0, t=1))
+    fig.update_xaxes(showline=True, linewidth=1, gridcolor='lightgrey',
+                     linecolor='black', mirror=True)
+    fig.update_yaxes(showline=True, linewidth=1, gridcolor='lightgrey',
+                     linecolor='black', mirror=True)
+    fig.update_layout(
+        xaxis=dict(
+            tickmode='array',
+            tickvals=[0.01, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 0.99]
+        )
+    )
+    fig.write_image(os.path.join(result_dir, "xy_ratio.pdf"))
+    time.sleep(2)
+    fig.write_image(os.path.join(result_dir, "xy_ratio.pdf"))

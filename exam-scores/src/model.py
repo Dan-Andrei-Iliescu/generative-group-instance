@@ -8,8 +8,10 @@ from src.loss_funcs import elbo_func, v_vs_n_func, nemeth_func
 # define a PyTorch module for the VAE
 class Model(nn.Module):
     def __init__(
-            self, group_acc=None, inst_cond=True, reg=None, x_dim=1, u_dim=2,
-            v_dim=1, h_dim=32, lr=1e-4, wd=1e-0):
+            self, group_acc=None, inst_cond=True, reg=None,
+            x_dim=2, u_dim=2, v_dim=2, h_dim=32,
+            uv_ratio=0.5, xy_ratio=1.,
+            lr=1e-4, wd=1e-0):
         super().__init__()
         self.group_acc = group_acc
         self.inst_cond = inst_cond
@@ -29,7 +31,7 @@ class Model(nn.Module):
             self.inst_enc = InstEncoder(x_dim, u_dim, v_dim, h_dim)
 
         # create decoder network
-        self.decoder = DecoderGiven()
+        self.decoder = DecoderGiven(uv_ratio=uv_ratio, xy_ratio=xy_ratio)
 
         # create adversary network depending on which regularization to use
         if self.reg == "v_vs_n":
