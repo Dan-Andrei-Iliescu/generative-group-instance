@@ -121,10 +121,8 @@ class DecoderGiven(nn.Module):
         batch_size = u.shape[0]
         u = torch.broadcast_to(u, [batch_size, v.shape[1], u.shape[2]])
         x = torch.zeros_like(v)
-        x[:, :, 0] = self.uv_ratio * u[:, :, 0] \
-            + (u[:, :, 1]**2 + 1)**self.uv_ratio \
-            * (1 - self.uv_ratio) * self.xy_ratio * v[:, :, 0]
-        x[:, :, 1] = (1 - self.xy_ratio) * v[:, :, 1]
+        x[:, :, 0] = u[:, :, 0] + v[:, :, 0]
+        x[:, :, 1] = v[:, :, 1]
         return x
 
 

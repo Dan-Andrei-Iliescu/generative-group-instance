@@ -10,7 +10,7 @@ from utils.helpers import elapsed_time
 
 def exp(result_dir="results", exp_name=None, training=True):
     exp_dir = os.path.join(result_dir, exp_name)
-    num_epochs = 32
+    num_epochs = 64
 
     if training:
         # All possible conditions
@@ -33,12 +33,13 @@ def exp(result_dir="results", exp_name=None, training=True):
         lr_def = 4
 
         seed_vals = [2, 8, 32, 128, 512]
-        seed_vals = [2, 8, 32]
+        seed_vals = [2, 32, 512]
+        # seed_vals = [128]
 
         uv_ratio_vals = [0.01, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 0.99]
         uv_ratio_def = 0.5
 
-        xy_ratio_vals = [0.01, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 0.99]
+        xy_ratio_vals = [0., 0.1, 0.5, 0.9, 1.]
         xy_ratio_def = 1.
 
         # Select relevant conditions based on the requested experiment

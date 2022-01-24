@@ -189,8 +189,8 @@ def moving_avg(a, n):
 
 def plot_results(df, result_dir, skip):
     titles = ['a) Reconstruction', "b) Translation",
-              "c) U Probing",
-              "d) V Probing"]
+              "c) Probing U",
+              "d) Probing V"]
     fig = make_subplots(
         rows=1, cols=4,
         subplot_titles=titles,
@@ -261,8 +261,8 @@ def plot_results(df, result_dir, skip):
 
 def plot_uv_ratio(df, result_dir, skip):
     titles = ['a) Reconstruction', "b) Translation",
-              "c) U Probing",
-              "d) V Probing"]
+              "c) Probing U",
+              "d) Probing V"]
     fig = make_subplots(
         rows=1, cols=4,
         subplot_titles=titles,
@@ -345,12 +345,6 @@ def plot_uv_ratio(df, result_dir, skip):
                      linecolor='black', mirror=True)
     fig.update_yaxes(showline=True, linewidth=1, gridcolor='lightgrey',
                      linecolor='black', mirror=True)
-    fig.update_layout(
-        xaxis=dict(
-            tickmode='array',
-            tickvals=[0.01, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 0.99]
-        )
-    )
     fig.write_image(os.path.join(result_dir, "uv_ratio.pdf"))
     time.sleep(2)
     fig.write_image(os.path.join(result_dir, "uv_ratio.pdf"))
@@ -358,8 +352,8 @@ def plot_uv_ratio(df, result_dir, skip):
 
 def plot_xy_ratio(df, result_dir, skip):
     titles = ['a) Reconstruction', "b) Translation",
-              "c) U Probing",
-              "d) V Probing"]
+              "c) Probing U",
+              "d) Probing V"]
     fig = make_subplots(
         rows=1, cols=4,
         subplot_titles=titles,
@@ -421,9 +415,9 @@ def plot_xy_ratio(df, result_dir, skip):
 
     fig.update_yaxes(title_text='Error (MSE)', col=1)
     fig.update_xaxes(
-        title_text='Ratio of strength between U and V in the generation of the exam-score dataset', col=2)
+        title_text='Ratio of magnitude between the confounded and unconfounded components of the instance factor', col=2)
     fig.update_xaxes(
-        tickvals=[0.01, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 0.99])
+        tickvals=[0., 0.1, 0.5, 0.9, 1.])
     fig.update_layout(
         width=2*BIG_FIG_SIZE,
         height=BIG_FIG_SIZE,
@@ -442,12 +436,6 @@ def plot_xy_ratio(df, result_dir, skip):
                      linecolor='black', mirror=True)
     fig.update_yaxes(showline=True, linewidth=1, gridcolor='lightgrey',
                      linecolor='black', mirror=True)
-    fig.update_layout(
-        xaxis=dict(
-            tickmode='array',
-            tickvals=[0.01, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 0.99]
-        )
-    )
     fig.write_image(os.path.join(result_dir, "xy_ratio.pdf"))
     time.sleep(2)
     fig.write_image(os.path.join(result_dir, "xy_ratio.pdf"))

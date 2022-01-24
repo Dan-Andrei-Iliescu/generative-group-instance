@@ -26,7 +26,7 @@ def train(
     # Setup datasets
     train_data, test_a, test_b, test_ab = generate_dataset(
         num_train_batches=num_train_batches, num_test_batches=num_test_batches,
-        batch_size=batch_size, seed=seed, uv_ratio=uv_ratio)
+        batch_size=batch_size, seed=seed, uv_ratio=uv_ratio, xy_ratio=xy_ratio)
 
     train_x = train_data[0]
     train_u = train_data[1]
@@ -115,7 +115,7 @@ def train(
     for df in dfs:
         test_df = pd.concat([test_df, df])
     if os.path.exists(result_csv):
-        read_df = pd.read_csv(result_csv, engine='python')
+        read_df = pd.read_csv(result_csv, engine='c')
         test_df = pd.concat([read_df, test_df])
     test_df.to_csv(result_csv, index=False)
 

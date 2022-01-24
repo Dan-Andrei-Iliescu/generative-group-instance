@@ -27,8 +27,7 @@ def generator(u, v, uv_ratio, xy_ratio):
     for batch_idx in range(num_batches):
         val = np.zeros_like(v[batch_idx])
         val[:, :, 0] = uv_ratio * u[batch_idx, :, :, 0] \
-            + (u[batch_idx, :, :, 1]**2 + 1)**uv_ratio \
-            * (1 - uv_ratio) * xy_ratio * v[batch_idx][:, :, 0]
+            + (1 - uv_ratio) * xy_ratio * v[batch_idx][:, :, 0]
         val[:, :, 1] = (1 - xy_ratio) * v[batch_idx][:, :, 1]
         x.append(val)
     return x
