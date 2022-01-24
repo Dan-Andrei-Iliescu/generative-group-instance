@@ -55,12 +55,12 @@
 
 % The \icmltitle you define below is probably too long as a header.
 % Therefore, a short form for the running title is supplied here:
-\icmltitlerunning{Disentangling Confounded Groups}
+\icmltitlerunning{One Datapoint is Not Enough: Disentangling Grouped Data with Confounding}
 
 \begin{document}
 
 \twocolumn[
-\icmltitle{Disentangling Confounded Groups}
+\icmltitle{One Datapoint is Not Enough: Disentangling Grouped Data with Confounding}
 
 % It is OKAY to include author information, even for blind
 % submissions: the style file will automatically remove it for you
@@ -106,7 +106,7 @@
 \printAffiliationsAndNotice{\icmlEqualContribution} % otherwise use the standard text.
 
 \begin{abstract}
-Group-instance disentanglement is the problem of learning separate representations for within-group and across-group variation.  In our work,  we propose the Context-Aware Variational Autoencoder (CxVAE), a method that can perform group-instance disentanglement on data with ``emergent'' groups (i.e.  data where the group and instance variables cannot be inferred from a single datapoint). First,  we introduce a simple synthetic dataset to show that current state-of-the-art methods based on the Group VAE fail to learn disentangled representations on datasets with emergent groups. Next, we present a modified model that 1) infers the instance variable conditionally on the group variable, 2) has a more expressive group encoder, 3) optimizes a regularization objective that encourages independence between the instance variable and the grouping. Finally, we show empirically the impact of each modification with respect to holdout data likelihood, unsupervised translation, and other disentanglement metrics.
+Group-instance disentanglement is the problem of learning separate representations for within-group and across-group variation. We introduce the Context-Aware Variational Autoencoder (CxVAE), a method which can perform group-instance disentanglement on datasets with confounding (i.e. where a single observation is not sufficient to accurately infer the group and instance variables). First, we generate a dataset with confounding that cannot be disentangled by the current state-of-the-art methods. Next, we improve upon these methods by proposing 3 modifications: 1) conditioning the instance variable on the group variable, 2) a more expressive group encoder, 3) a regularization objective that encourages independence between the instance variable and the grouping. Our method shows considerable gains in performance measured by several disentanglement metrics: holdout reconstruction error, unsupervised translation error, and latent code probing. Finally, we explore how adjusting the parameters of the data-generating process affects the performance gap between CxVAE and the state-of-the-art.
 \end{abstract}
 
 \section{Introduction}
@@ -116,32 +116,33 @@ Group-instance disentanglement is the problem of learning separate representatio
     \vskip 0.2in
     \begin{center}
     \centerline{\includegraphics[width=0.7\columnwidth]{files/bayes_net_one.pdf}}
-    \caption{Probabilistic graphical model of the Group Variational Autoencoder.  $u$ are group variables and $v$ are instance variables. The conditional $q(v_{ik} | u_i)$ (shown in blue) is absent from the existing literature but present in our proposed model. This enables our model to accurately infer the instance variable even when the groups are confounded. }
-    \label{bayes-net}
+    \caption{\textbf{Group-Instance Generative Model.} For each group $i$, a group variable$u_i$ and a set of instance variables $\mathbf{v}$ generates the set of observations $\mathbf{x}$. The conditional $q(v_{ik} | u_i)$ (\textbf{blue arrow}) is absent from the existing literature but present in our proposed variational model. This enables our model to accurately infer the instance variable even when the groups are confounded. }
+    \label{fig:pgm}
     \end{center}
     \vskip -0.2in
 \end{figure}
 
-Group-instance disentanglement is the task of learning a representation network $r(\mathbf{x})$ which transforms a group of observations $\mathbf{x} = \{x_1, ..., x_K\}$ (e.g. images grouped by author,  temperature readings grouped by weather station,  etc) into a \textit{group} code $u$ and a set of \textit{instance} codes $\mathbf{z} = \{z_1, ..., z_K\}$. The goal is that the group code should capture all the information that distinguishes one group from another,  while the instance code should capture all the information that distinguishes the observations within a group, but none of the group information.
+Group-instance disentanglement is the task of learning a representation network $r(\mathbf{x})$ which transforms a group of observations $\mathbf{x} = \{x_1, ..., x_K\}$ (e.g. images grouped by author,  temperature readings grouped by weather station,  etc) into a \textit{group} code $u$ and a set of \textit{instance} codes $\mathbf{v} = \{v_1, ..., v_K\}$. The goal is that the group code should capture all the information that distinguishes one group from another,  while the instance code should capture all the information that distinguishes the observations within a group, but none of the group information.
 
-All the current state-of-the-art approaches to group-instance disentanglement \citep{Bouchacourt2018MultiLevelVA,Hosoya2019GroupbasedLO,Shu2020Weakly, Chen2020WeaklySD,Locatello2020WeaklySupervisedDW} follow the Variational Autoencoder framework \citep{Kingma2014AutoEncodingVB,JimenezRezende2014StochasticBA} whereby a generative model mapping latent variables (group and instance) to data observations is trained using variational inference. We call this family of models the Group Variational Autoencoder (GVAE). These methods vary in how they define the variational latent posterior and any additional regularization objectives they might have.
+The standard model for this task is the \textit{Group-Instance Generative Model} (GIGM) \citep{Bouchacourt2018MultiLevelVA, Hosoya2019GroupbasedLO}, depicted in \cref{fig:pgm}. The model treats group and instance as independent latent variables involved in the generation of the data.  We, in common with existing methods, train this model following the Variational Auteoncoder paradigm \citep{Kingma2014AutoEncodingVB,JimenezRezende2014StochasticBA}. In this framework, disentanglement is a property of the variational latent posterior $q(u, \mathbf{v} | \mathbf{x})$ which is implemented as a representation network.
 
-We believe that GVAE has the potential to advance many scientific fields where analysing the causal factors of grouped data is essential, including medicine \citep{Liang1986LongitudinalDA}, biology \citep{Quinn2002ExperimentalDA} and psychology \citep{Schafer2002MissingDO}. That analysis is typically performed using mixed-effects models \citep{Pinheiro2001MixedEffectsMI}, which decompose the data variation into random-effects (group variables) and individual error terms (instance variables). However, these parameters can only be estimated efficiently in very simple models. By contrast, the GVAE offers a highly expressive mixed-effects model (the decoder) and an inbuilt inference network (the encoder).
+Implementing the variational latent posterior so that it learns disentangled representations is not trivial and there exist several approaches. Challenges include how to accumulate evidence from multiple observations in order to infer the group variable \citep{Bouchacourt2018MultiLevelVA, Hosoya2019GroupbasedLO} and how to design a regularization objective that encourages disentanglement in practice \citep{Nmeth2020AdversarialDW}. 
 
-In order to learn useful disentangled representations for these problems,  the GVAE has to capture the joint distribution between the group and instance variables conditioned on the data. In other words,  the representation network must be able to distinguish between two identical observations coming from different groups, thus encoding them with different instance variables.  We call data groups of this kind ``emergent'', because the group and instance variables are emergent properties of the group as a whole, rather than any individual observation. 
+Many datasets require that the inference model be able to capture the joint distribution between the group and instance variables conditioned on the observations. These are datasets where two identical observations could have come from different groups, and thus have different instance factors. We call these datasets \textit{with confounding} because in the data-generating process $u$ is a confounding variable when estimating $v$ from $x$. 
 
-Emergent groups are very common, occurring in datasets where the latent variables cannot be accurately inferred from a single observation. For example, in the context of soybean plant growth \citep{Davidian1995NonlinearMF}, it is impossible to deduce the age (instance) of a plant based solely on its leaf weight (observation) without also knowing its genotype (group). 
+Such datasets are very common. For example, the problem of soybean plant growth \citep{Davidian1995NonlinearMF} has a dataset with confounding. It is impossible to deduce the age (instance) of a plant based solely on its leaf weight (observation) without also knowing its genotype (group). 
 
-Unfortunately,  the current state-of-the-art methods fail to learn disentangled representations on emergent groups.We show this empirically by creating a simple dataset of student exam scores grouped by school. The groups in this dataset are emergent, because the instance variable captures the score of a student in relation to the distribution of scores at their school. Instead of disentangling, the existing methods mostly forego the group variable and use the instance variable to encode the variation across groups. The main
+We show empirically that the state-of-the-art methods fail to learn disentangled representations on datasets with confounding.We generate a simple dataset of student exam scores grouped by school.  The instance variable captures the score of a student in relation to the distribution of scores at their school. Instead of disentangling, the existing methods split the representation of the group factor across both group and instance variables. 
 
-In order to tackle this challenge, we propose a new GVAE model with several novel modifications. The main novelty is an instance encoder conditional on the previously inferred group variable, which enables the variational latent posterior to match the generative latent posterior.  Additionally, we use an expressive Deep Set network \citep{Zaheer2017DeepS} to infer the group variable more accurately, and also design a novel regularization objective that encourages independence between the inferred instance variable and the data group. 
+In order to tackle this challenge, we propose the Context-Aware Variational Autoencoder (CxVAE), another approach to the GIGM model with several novel modifications. The main novelty is an instance encoder conditioned on the inferred group variable, which enables the variational latent posterior to match the full generative latent posterior.  Additionally, we use an expressive Deep Set network \citep{Zaheer2017DeepS} to infer the group variable more accurately, and also design a novel regularization objective that encourages independence between the inferred instance variable and the ground-truth group factor. 
 
-Our work comprises the following contributions:
+We present the following contributions:
 \begin{enumerate}
-    \item We formalize the notion of ``emergent'' groups and create a simple synthetic dataset on which the current GVAE methods fail to learn disentangled representations.
+    \item We formalize the notion of datasets with confounding and generate a simple dataset on which the current group-instance methods fail to learn disentangled representations.
     \item We propose a new model, called the Context-Aware Variational Autoencoder (CxVAE) which can learn disentangled representations on emergent groups.
     \item We perform extensive evaluation showing that our model outperforms the existing methods in holdout-data log-likelihood, unsupervised translation, and ground-truth factor prediction.
-    \item We perform an ablation study showing the relative performance gain of each modification to the GVAE.
+    \item We complete an ablation study showing the relative performance gain brought by each modification of our model.
+    \item By varying the amount of confounding in the data-generating process, we show that confounding explains the performance gain of the CxVAE over existing methods. We also show how different magnitude ratios between the group and instance factors affect disentanglement.
 \end{enumerate}
 
 \section{Generative Group-Instance}
@@ -160,7 +161,7 @@ Because the exact likelihood is intractable, the Variational Autodencoder \citep
 
 $$\log p(\mathbf{x}) \geq \mathbb{E}_{q(u, \mathbf{v} | \mathbf{x})} [\log p(\mathbf{x} | u, \mathbf{v})] - \mathrm{KL} [q(u, \mathbf{v} | \mathbf{x}) || p(u, \mathbf{v})]$$
 
-\textit{The models in the GVAE family use a class of variational distributions that assume independence between the latent variables in a group when conditioned on the data.}
+\textit{Existing methods use a class of variational distributions that assume independence between the latent variables in a group when conditioned on the data.}
 
 $$q(u, \mathbf{v} | \mathbf{x}) = q(u | \mathbf{x}) \prod_{k=1}^K q(v_k | x_k)$$
 
@@ -168,7 +169,7 @@ In our work, we show that this assumption hinders disentanglement when the gener
 
 \subsection{Group Encoder}
 
-The variational group posterior is realised as normal density with $\mu, \Sigma$ computed with an encoder network. The way to implement the encoder network is not obvious, since the number of inputs $K$ varies across groups. \citet{Hosoya2019GroupbasedLO} encode separately each observation in the group using the same encoder $E_u$ to produce $\mu_k, \Sigma_k$ and then averages the outputs.
+We, in common with existing methods, implement the variational group posterior with normal density with $(\mu, \Sigma)$ computed with an encoder network. The way to implement the encoder network is not obvious, since the number of inputs $K$ varies across groups. \citet{Hosoya2019GroupbasedLO} encode separately each observation in the group using the same encoder $E_u$ to produce $\mu_k, \Sigma_k$ and then averages the outputs.
 
 $$\mu = \frac{1}{N} \sum_{k=1}^K \mu_k, ~ \Sigma = \frac{1}{N} \sum_{k=1}^K \Sigma_k$$
 
@@ -235,11 +236,11 @@ In this paper, we claim that the current methods in the GVAE family do not perfo
 
 \subsection{Exam-Scores Problem}
 
-\begin{figure}[ht]
+\begin{figure}[t]
     \vskip 0.2in
     \begin{center}
     \centerline{\includegraphics[width=\columnwidth]{files/data.pdf}}
-    \caption{\textbf{Normalized exam scores of individual students grouped by school.}}
+    \caption{\textbf{Example of our exam-scores dataset.} Each school is a different group of student scores. The relative quality of a score cannot be inferred without knowing the distribution of scores in the school.}
     \label{exam-score}
     \end{center}
     \vskip -0.2in
@@ -247,9 +248,9 @@ In this paper, we claim that the current methods in the GVAE family do not perfo
 
 Suppose we wanted to model the exam scores of students from different schools. Our model must separate the school-level effect (the group factor) from the student-level effect (the instance factor). We define the following generative model:
 
-$$x_{ik} = 2 ~ \mu_i +  (\sigma^2_i + 1) v_{ik} + \epsilon_{ik}, ~ i \in 1:N, ~ k \in 1:K_i$$
+$$x_{ik} = 2 ~ \mu_i +  (\sigma^2_i + 1) v_{ik}, ~ i \in 1:N, ~ k \in 1:K_i$$
 
-where $x_{ij}$ is the student score, $u_i = (\mu_i, \sigma_i)$ is the school-level effect, $v_{ij}$ is the student-level effect, and $\epsilon_{ik}$ is a normally-distributed error term. We assume a $\mathcal{N} (0, 1)$ prior distribution for the latent variables.
+where $x_{ij}$ is the student score, $u_i = (\mu_i, \sigma_i)$ is the school-level effect, $v_{ij}$ is the student-level effect. We assume a $\mathcal{N} (0, 1)$ prior distribution for the latent variables.
 
 We first sample the model to generate a dataset ($N = 32,768, ~ K_i \sim \mathrm{Poisson} (16) + 8$) and then use the same model as the generative model in our Variational Autoencoder, instead of a neural network. The figure below shows what the data looks like.
 
@@ -285,88 +286,131 @@ We propose a new model which can perform well on datasets generated from entangl
 
 \section{Measuring Disentanglement}
 
-In the context of the GVAE family, disentanglement is a property of the variational latent posterior. The inferred group and instance variables are disentangled when they are maximally informative about the group and instance variables of the true data generating distribution. We assume this true model has the same factorization of the joint distribution as the generative model, but the parameters are unknown.
 
-Therefore, we can use the mutual information between the true and inferred latents as a measure of disentanglement.
+\subsection{Probing $u$ and $\mathbf{v}$}
 
-$$I(U^t; U^q) = \mathrm{KL} [\mathrm{Pr}_{U^q, U^t} || \mathrm{Pr}_{U^q} \mathrm{Pr}_{U^t}]$$
-$$= \mathbb{E}_{U^q} \mathbb{E}_{U^t | U^q} \left[ \log \frac{\mathrm{Pr}_{U^t | U^q}}{\mathrm{Pr}_{U^t}} \right]$$
-and since $\mathrm{Pr}_{U^t}$ does not depend on $q$
-$$= \mathbb{E}_{U^q} \mathbb{E}_{U^t | U^q} [ \log \mathrm{Pr}_{U^t | U^q}] + \mathrm{const}$$
+Our first evaluation metric is a direct application of the definition of disentanglement; that a given representation should capture as much information as possible about the corresponding data-generating factor,  and as little as possible about the other factors \citep{Locatello2020WeaklySupervisedDW}.  In the case of group-instance,  the inferred group variable $\hat{u}$, for example, should be maximally predictive of the data-generating group factor $u$, and minimally predictive of the set of instance factors $\mathbf{v}$
 
-We estimate the density $\mathrm{Pr}_{U^t | U^q}$ by training a regression network to predict the value of $U^t$ given $U^q$. The mean-squared error of the prediction on the holdout set is a monotonic function of the mutual information with respect to changes in $q$.
+However, not all combinations of inferred latents and data-generating factors are worth analysing. As pointed out by \citet{Nmeth2020AdversarialDW}, the failure case we are trying to prevent in group-instance disentanglement is that the inferred instance variables $\hat{\mathbf{v}}$ might learn information pertaining to the data-generating group factor $u$. Other cases, such that the inferred group variable might learn to represent instance information, are not possible because of the structure of the variational model. The group encoder is an order-agnostic accumulation of input observations and the instance encoder is applied separately to each observation (so no way for information from observation $x_l$ to bleed into instance variable $\hat{v}_k$).
+
+Thus, the metric is computed as follows: at training time, we learn two regressors, called probes,  to predict the data-generating group factor $u$: one probe takes as input the inferred group variable $\hat{u}$ and the other takes as input the set of inferred instance variables $\hat{\mathbf{v}}$. The prediction error rate of these regressors on the holdout set gives the disentanglement metric; the more disentangled the representation is, the lower the error of the $u$-probe and the higher the error of the $v$-probe. Since we are using a synthetic dataset for evaluation, we can measure the mean squared error directly between the prediction and the ground-truth group factor.
+
+Training predictors on latent representations is a universal approach for evaluating disentanglement.  In particular, \citet{Bouchacourt2018MultiLevelVA, Nmeth2020AdversarialDW} have a very similar setup to ours, the only difference being that they use a classifier instead of a regressor. This is because they evaluate on real data whose ground-truth factors are unknown, so they use human lables as a proxy.
 
 \subsection{Unsupervised Translation}
 
-Unsupervised translation is the process of transforming an observation by changing its group code while keeping its instance code fixed. This is a common downstream task for disentangled representations because it requires a clean separation between the group and instance representations \citep{Tenenbaum2000SeparatingSA}. Therefore, it can be used to quantify the quality of disentanglement.
-
-Formally, let $i, j$ be the indices of the source and target group, respectively. Translation involves sampling a group of instance codes from the source group $q(\mathbf{v}_i | \mathbf{x}_i)$ and a group code from the target group $q(u_j | \mathbf{x}_j)$. Then, we generate the translated observations by combining each instance code with the group code $p(x'_{k} | u_j, \mathbf{v}_j)$.
-
-We measure translation quality by taking the mean-squared error between the translation performed with each model and the ground-truth translation computed using the ground-truth factors and the true data-generating process.
-
-\section{Evaluation}
-
-\begin{figure}[ht]
+\begin{figure}[t]
     \vskip 0.2in
     \begin{center}
 \begin{subfigure}{0.49\columnwidth}
-    \includegraphics[width=\textwidth]{files/data_trans.pdf}
+    \includegraphics[width=\textwidth]{files/trans_ours.pdf}
     \caption{CxVAE}
-    \label{fig:first}
 \end{subfigure}
 \hfill
 \begin{subfigure}{0.49\columnwidth}
-    \includegraphics[width=\textwidth]{files/data_trans.pdf}
+    \includegraphics[width=\textwidth]{files/trans_theirs.pdf}
     \caption{ML-VAE}
-    \label{fig:second}
 \end{subfigure}
-    \caption{Qualitative comparison of unsupervised translation between CxVAE (top) and ML-VAE \citep{Bouchacourt2018MultiLevelVA} (bottom). Our model captures the distribution of values in the target group better than the existing methods.}
-    \label{qualitative}
+    \caption{\textbf{Unsupervised translation with our CxVAE and the ML-VAE}.  The task is to generate a set of observations with the instance variables or the source group and the group variable of the target group. Visual inspection suggests that our model better captures the mean and variance of the target group.}
+    \label{fig:trans}
     \end{center}
     \vskip -0.2in
 \end{figure}
 
-We test CxVAE against the other models from the GVAE family.
+Unsupervised translation is the process of transforming an observation by changing its group code while keeping its instance code fixed. This is a primary downstream task for disentangled representations because it requires a clean separation between the group and instance representations \citep{Tenenbaum2000SeparatingSA}. Therefore, it can be used to quantify the quality of disentanglement.
 
-\subsection{Quantitative Evaluation}
+Formally, let $i, j$ be the indices of the source and target group, respectively. Translation involves sampling a group of instance codes from the source group $q(\mathbf{v}_i | \mathbf{x}_i)$ and a group code from the target group $q(u_j | \mathbf{x}_j)$. Then, we generate the translated observations by combining each instance code with the group code $p(x'_{k} | \hat{u}_j, \hat{\mathbf{v}}_j)$. An example of translation comparing our CxVAE with the ML-VAE \citep{Bouchacourt2018MultiLevelVA} can be seen in \cref{fig:trans}.
+
+We measure the translation quality by taking the mean squared error between the translation performed with each model and the ground-truth translation computed using the true data-generating process.
+
+\section{Experiments}
 
 \begin{figure}[t]
 \vskip 0.2in
 \begin{center}
 \centerline{\includegraphics[width=\columnwidth]{files/results.pdf}}
-\caption{Our CxVAE produces significant improvements over the state-of-the-art in every disentanglement metric considered: holdout reconstruction error (\textbf{lower is better}), translation error (\textbf{lower is better}), $U$-probing (\textbf{lower is better}) and $V$-probing (\textbf{higher is better}).  We show box-plots for the distribution of scores over 100 random initialisations. }
-\label{results}
+\caption{Our CxVAE produces considerable improvements over the state-of-the-art in every disentanglement metric considered: holdout reconstruction error (\textbf{lower is better}), translation error (\textbf{lower is better}), $u$-probing (\textbf{lower is better}) and $\mathbf{v}$-probing (\textbf{higher is better}).  We show box-plots for the distribution of scores over 100 random initialisations. }
+\label{fig:results}
 \end{center}
 \vskip -0.2in
 \end{figure}
-
-\subsection{Ablation Study}
 
 \begin{figure}[t]
 \vskip 0.2in
 \begin{center}
 \centerline{\includegraphics[width=\columnwidth]{files/ablation.pdf}}
-\caption{\textbf{Ablation study.} Replacing any novel component of our CxVAE with an existing alternative leads to worse performance. Note that the largest reduction in performance is brought by making the instance encoder unconditional. The next is changing the regularization, followed by using a less expressive group encoder.}
-\label{ablation}
+\caption{\textbf{Ablation study.} Replacing any novel component of our CxVAE with an existing alternative leads to worse performance. Note that the largest reduction in performance is brought by making the instance encoder unconditional. The next largest reduction is caused by changing the regularization, followed by using a less expressive group encoder.}
+\label{fig:ablation}
 \end{center}
 \vskip -0.2in
 \end{figure}
 
-In order to quantify the effect of each proposed improvement, we perform an ablation study whereby we measure the decrease in performance resulting from replacing a proposed element of our model with a current alternative.
-
-The proposed improvements have the best individual performance with respect to both reconstruction and translation error in each of the three categories. The choice of a group-aware instance encoder leads to the most significant increase in performance.
-
-\subsection{Relative strength of the group and instance components}
+\begin{figure*}[t]
+\vskip 0.2in
+\begin{center}
+\centerline{\includegraphics[width=\textwidth]{files/xy_ratio.pdf}}
+\caption{\textbf{The performance gain of our CxVAE increases with more confounding.} We show disentanglement on datasets generated with different values of the $\gamma$ hyper-parameter, controlling the ratio of magnitudes between the confounded and unconfounded components of the instance factor. For low values of $\gamma$ the instance factor is not confounded and so the CxVAE and GVAE perform equally well. However, as $\gamma$ increases, GVAE performs more poorly.}
+\label{fig:xy}
+\end{center}
+\vskip -0.2in
+\end{figure*}
 
 \begin{figure*}[t]
 \vskip 0.2in
 \begin{center}
 \centerline{\includegraphics[width=\textwidth]{files/uv_ratio.pdf}}
-\caption{\textbf{Ablation study.} Replacing any novel component of our CxVAE with an existing alternative leads to worse performance. Note that the largest reduction in performance is brought by making the instance encoder unconditional. The next is changing the regularization, followed by using a less expressive group encoder.}
-\label{ablation}
+\caption{\textbf{Similar magnitudes of the group and instance factors produces a dip in the performance of the GVAE. } We show disentanglement on exam-score datasets generated with different values of the $\lambda$ hyper-parameter, controlling the ratio of magnitudes between the group and instance factors.  The greatest gap in performance between our CxVAE and the GVAE occurs when $\lambda=0.5$ when the magnitude of the variation across groups is equal to the magnitude within groups.  Too small (weak groups) or too large (strong groups) values of $\lambda$ lead to a normal autoencoding problem.}
+\label{fig:uv}
 \end{center}
 \vskip -0.2in
 \end{figure*}
+
+In the first experiment, we compare our CxVAE with the state-of-the-art in group-instance disentanglement, namely the Multi-Level VAE (ML-VAE) \citep{Bouchacourt2018MultiLevelVA}, the Group VAE (GVAE) \citep{Hosoya2019GroupbasedLO} and the Adversarial GVAE (GVAE-AD) \citep{Nmeth2020AdversarialDW}.
+
+We generate a dataset with $N = 65,536$ groups. The size of each group is distributed according to a Poisson distribution $K_i \sim 8 + \mathrm{Poisson}(16)$. We train each model for 64 epochs, and use the last 10 epochs for evaluation. Additionally, we run the experiment for 10 different random seeds initialisations, both for the data generating process and the networks. We use the same 10 seeds to compare. This gives us 100 measurements to plot in \cref{fig:results}.
+
+\paragraph{Results} Our CxVAE produces considerable improvements over the state-of-the-art in every disentanglement metric considered (\cref{fig:results}). While the scores of the existing methods cluster together, the gap between them and the CxVAE is larger than any 95\% confidence interval. It is also interesting to note how CxVAE produces a smaller reconstruction error on the holdout dataset, suggesting that disentangled representations generalise better to unseen groups.
+
+\subsection{Ablation Study}
+
+In order to quantify the contribution of each of the modifications that comprise our proposed model, we perform an ablation study whereby we measure the decrease in performance resulting from replacing a proposed component with an existing alternative. For example, when considering the group encoder, we include in the comparison two hybrid models based on the CxVAE: one of them has a product of normals encoder as in the ML-VAE, while the other has an averaging encoder as in the GVAE.  For the instance encoder, the alternative is to have no conditioning on the group variable. For the regularization, we compare with the adversarial loss of GVAE+AD and with no regularization at all. The results of the experiment are displayed in \cref{fig:ablation}.
+
+\paragraph{Results} The full CxVAE has a better performance than any alternative configuration.  In particular, the choice of a conditional instance encoder brings the largest improvement in performance, followed by the regularization objective, then the group encoder.
+
+\subsection{Degree of Confounding}
+
+Is the increased performance of our CxVAE solely due to the confounded data-generating process, or is it simply a better all-round model? To answer this, we create different exam-scores datasets with different degrees of confounding.  We do this by making the data 2-dimensional, with one dimension being confounded and the other being controlled only by the instance variable, and then trading off the magnitude of one to the other. Our new data generating process is the following:
+
+\begin{equation}
+x_{ik} = \begin{bmatrix}
+u_i + \gamma a_{ik}\\
+(1 - \gamma) b_{ik}
+\end{bmatrix}, ~ v_{ik} = \begin{bmatrix}
+a_{ik} \\ b_{ik}
+\end{bmatrix}
+\end{equation}
+
+where $a_{ik}$ is the dimension of the instance factor confounded by the group factor, while $b_{ik}$ is the unconfounded dimension. The trade-off is controlled using a hyper-parameter $\gamma \in [0,1]$. For low values of $\gamma$, the confounded variable should explain a small amount of the variation within groups. In that case, our CxVAE should not perform much better than existing methods, if our hypothesis about the relationship between CxVAE and confounding is correct.  Large values of $\gamma$ correspond to the settings we have already tested, so the performance gap should be large.
+
+\paragraph{Results} The measurements displayed in \cref{fig:xy} confirm our expectations. For low values of $\gamma$ the performance of our CxVAE is evenly matched to the GVAE.  As $\gamma$ increases, CxVAE scores remain relatively stable while GVAE scores decrease substantially.  It is clear that the degree of confounding in the dataset explains the performance gain that we see in the CxVAE. 
+
+\subsection{Stronger Group or Stronger Instance}
+
+It is interesting to observe how changing the relative strength of the group and instance ground-truth factors in the dataset impacts differentely the disentanglement in our CxVAE and GVAE. Since our data is generated by a simple mixed model, we can adjust the data-generating process as follows:
+
+\begin{equation}
+x_{ik} = \lambda u_i + (1 - \lambda) v_{ik}
+\end{equation}
+
+where $\lambda \in [0, 1]$ is a hyper-parameter controlling the strength of the group factor $\mu_i$ relative to the instance factor $v_{ik}$. 
+
+We expect that different values for $\lambda$ would change the characteristics of the disentanglement problem. A low value $\lambda \approx 0$ would generate a dataset with weak grouping that is virtually i.i.d. and that a normal autoencoder could represent. A large value $\lambda \approx 1$ would generate a dataset with strong groups where the observations within a group are noisy copies of one another, a setting that can also be solved by simple autoencoding.  A middle value $\lambda \approx 0.5$ would evenly match the impact of the group and instance variables. Here we expect the performance gain of the CxVAE over competing methods to be greatest.
+
+\paragraph{Results} Looking at \cref{fig:uv} we note, as expected, that the largest performance gain of the CxVAE occurs at $\lambda = 0$. Specifically, while the performance of the CxVAE increases steadily as $\lambda$ goes from 0 to 1,  the scores of GVAE dip significantly around $\lambda = 0.5$. Translation and $\mathbf{v}$-probing are most sensitive to the decrease in performance of the GVAE. We also observe that the scores generally increase with $\lambda$ even as the average magnitude of the data remains constant, possibly because for $\lambda \approx 0$ the group encoder cannot be used for learning, and thus expressiveness is lost.
+
+\section{Related Work}
+
+\section{Conclusions}
 
 \bibliography{main}
 \bibliographystyle{icml2022}
