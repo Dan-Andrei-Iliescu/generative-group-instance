@@ -2,6 +2,62 @@
 
 The paper pdf can be found [here](main.pdf).
 
+## 2022-01-26
+
+(6 hours)
+
+## 2022-01-25
+
+(6 hours) I have 12 more hours
+
+1. Finish paper with new angle on contribution but without any extra datasets
+   1. [x] Finish introduction with collaborative filtering example (0.5 hrs)
+   2. [x] Update description of dataset (0.5 hrs)
+   3. [ ] Update disentanglement metrics to show how they are rooted in the literature (0.5 hrs)
+   4. [ ] Write related work section
+      1. [ ] Talk about the area of weakly-supervised disentanglement, and what is different about it (1 hrs)
+      2. [ ] Talk about how people deal with confounding in other areas, like mixed-models, collaborative filtering, causal inference, time series (1 hrs)
+   5. [ ] Re-write experiments to highlight contribution (0.5 hrs)
+   6. [ ] Write conclusions
+      1. [ ] Summary of contributions
+      2. [ ] Interpretation
+   7. [x] Other tasks (1 hrs)
+
+
+If I had an unlimited amount of time to make the paper perfect, what would I do?
+1. I would test on collaborative filtering through multiple imputation using translation
+2. I would test on multiple imputation in clinical data with their model
+3. I would ascertain the level of disentanglement using the disentanglement metrics
+4. I would run tests on real data to show my model is not worse than the rest
+5. I would come up with a convincing definition of confounding and show that the datasets I am working with are confounded in this way.
+
+## 2022-01-24
+
+(4 hours)
+
+1. Take out other two contributions, leave just instance conditioning
+2. Finish paper
+3. Add background paragraphs to each section placing it in the disentanglement literature
+4. Give some context about how people deal with confounding
+5. Compare with disentanglement datasets and use their metrics
+
+I have 16 more hours.
+
+- [x] Write background (0.5 hrs)
+- [x] Model description only for instance conditioning. (0.5 hrs)
+- [x] Found task and datasets (3 hrs)
+  - Collaborative filtering on movielens dataset (easiest to implement and test)
+  - Soybean (easiest to explain)
+  - Alzheimers (most interesting and useful)
+  - Pulmonary disese (also used in the disentanglement literature)
+  - rotated MNIST
+- [ ] Write introduction (1 hrs)
+- [x] Updated paper to have just one contribution (0.5 hrs)
+
+### Datasets + Tasks
+- Collaborative filtering on MovieLens dataset
+- 
+
 ## 2022-01-23
 
 ## Code
