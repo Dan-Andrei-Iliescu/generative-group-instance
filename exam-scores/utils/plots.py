@@ -35,7 +35,7 @@ def group_assign(model_name):
     name_dict = {
         'True_ours_None': 'CxVAE',
         'True_nemeth_None': 'Other regularization',
-        'True_None_None': 'Other regularization',
+        'True_None_None': 'CxVAE',
         'False_ours_None': 'Other instance conditioning',
         'True_ours_mul': 'Other group encoder',
         'True_ours_med': 'Other group encoder',
@@ -54,7 +54,7 @@ def name_assign(model_name):
     name_dict = {
         'True_ours_None': 'CxVAE',
         'True_nemeth_None': 'A',
-        'True_None_None': 'B',
+        'True_None_None': 'CxVAE',
         'False_ours_None': 'C',
         'True_ours_mul': 'D',
         'True_ours_med': 'E',
@@ -72,21 +72,39 @@ def name_assign(model_name):
 def plot_data(x, result_path):
     fig = go.Figure()
     idx = 0
+    loc = 0.5
+    is_show = True
     for x_group in x[:NUM_GROUPS_PER_PLOT]:
         idcs = [idx for _ in x_group]
+        mu = np.mean(x_group[:, 0])
+        if idx < 4:
+            fig.add_hline(y=idx+0.5, line_color="lightgray", line_dash="dash")
         fig.add_trace(go.Scatter(
-            x=x_group[:, 0], y=idcs,
-            legendgroup=f"{idx}", showlegend=False, mode="markers",
-            marker_line_color=colour_assign(str(idx)),
+            x=x_group[:, 0], y=idcs, name="Scores",
+            legendgroup="0", showlegend=is_show, mode="markers",
+            marker_line_color=colour_assign(str(4)),
             marker_symbol="line-ns", marker_line_width=2))
         fig.add_trace(go.Violin(
-            x=x_group[:, 0], name=f"School {idx + 1}", side='positive',
-            legendgroup=f"{idx}", showlegend=True,
-            marker_color=colour_assign(str(idx))))
+            x=x_group[:, 0], name="Distribution for student i",
+            side='positive', points=False,
+            legendgroup="1", showlegend=is_show,
+            marker_color=colour_assign(str(4))))
+        fake = (mu + loc) / 2
+        fig.add_trace(go.Scatter(
+            x=[fake], y=[idx-0.3], name=f"Test difficulty for student i if score={loc}",
+            legendgroup="2", showlegend=is_show, mode="markers",
+            marker_size=10,
+            marker_color=colour_assign(str(1))))
+        fig.add_shape(
+            type="rect", x0=mu, y0=idx-0.2, x1=loc, y1=idx-0.4,
+            line=dict(color=colour_assign(str(1))),
+            fillcolor=colour_assign(str(1)))
         idx += 1
+        is_show = False
 
-    fig.update_xaxes(title_text="Exam Scores")
-    fig.update_yaxes(showticklabels=False, title_text="Schools")
+    fig.add_vline(x=loc)
+    fig.update_xaxes(title_text="Test Scores")
+    fig.update_yaxes(title_text="Student i")
     fig.update_layout(
         width=BIG_FIG_SIZE,
         height=FIG_SIZE,
@@ -100,6 +118,13 @@ def plot_data(x, result_path):
         xanchor="left",
         x=0
     ))
+    fig.update_layout(
+        xaxis=dict(
+            tickmode='linear',
+            tick0=loc,
+            dtick=0.5
+        )
+    )
     fig['layout'].update(margin=dict(l=0, r=0, b=0, t=1))
     fig.update_xaxes(showline=True, linewidth=1, gridcolor='lightgrey',
                      linecolor='black', mirror=True)
@@ -188,27 +213,28 @@ def moving_avg(a, n):
 
 
 def plot_results(df, result_dir, skip):
-    titles = ['a) Reconstruction', "b) Translation",
-              "c) Probing U",
-              "d) Probing V"]
+    titles = ['a) Reconstruction', "b) Multiple Imputation",
+              "c) MIG"]
     fig = make_subplots(
-        rows=1, cols=4,
+        rows=1, cols=3,
         subplot_titles=titles,
-        vertical_spacing=0.05, horizontal_spacing=0.06)
+        vertical_spacing=0.05, horizontal_spacing=0.07)
 
     df = df.loc[df['epoch'] > skip]
-
     model_names = pd.unique(df['model_name'])
 
     rows = [1, 1, 1, 1]
     cols = [1, 2, 3, 4]
-    test_names = ['rec_error', 'trans_error', 'u_error', 'v_error']
+    test_names = ['rec_error', 'trans_error', 'u_error']
     seen = []
-    for plt_idx in range(4):
+    for plt_idx in range(3):
         test_df = df.loc[df['test_name'] == test_names[plt_idx]]
         ascending = False if plt_idx == 3 else True
+        """
         group_df = test_df.groupby('model_name')['value'].mean()\
             .reset_index().sort_values(by=['value'], ascending=ascending)
+        """
+        group_df = test_df.groupby('model_name')['value'].mean().reset_index()
         model_names = group_df['model_name']
         for model_name in model_names:
             model_df = test_df.loc[test_df['model_name'] == model_name]
@@ -223,6 +249,7 @@ def plot_results(df, result_dir, skip):
                 showlegend=(group_assign(model_name) not in seen)
             ), row=rows[plt_idx], col=cols[plt_idx])
             seen.append(group_assign(model_name))
+        """    
         fig.add_trace(go.Scatter(
             x=group_df['model_name'].apply(name_assign),
             y=group_df['value'],
@@ -232,9 +259,9 @@ def plot_results(df, result_dir, skip):
             showlegend=("green" not in seen)
         ), row=rows[plt_idx], col=cols[plt_idx])
         seen.append("green")
+        """
 
-    fig.update_yaxes(title_text='Error (MSE)', col=1)
-    fig.update_xaxes(title_text='Models: best (left) to worst (right)', col=2)
+    fig.update_xaxes(title_text='Models', col=2)
     fig.update_layout(
         width=BIG_FIG_SIZE,
         height=BIG_FIG_SIZE,
@@ -260,13 +287,12 @@ def plot_results(df, result_dir, skip):
 
 
 def plot_uv_ratio(df, result_dir, skip):
-    titles = ['a) Reconstruction', "b) Translation",
-              "c) Probing U",
-              "d) Probing V"]
+    titles = ['a) Reconstruction', "b) Multiple Imputation",
+              "c) MIG"]
     fig = make_subplots(
-        rows=1, cols=4,
+        rows=1, cols=3,
         subplot_titles=titles,
-        vertical_spacing=0.05, horizontal_spacing=0.03)
+        vertical_spacing=0.05, horizontal_spacing=0.04)
 
     df = df.loc[df['epoch'] > skip]
 
@@ -277,7 +303,7 @@ def plot_uv_ratio(df, result_dir, skip):
     cols = [1, 2, 3, 4]
     test_names = ['rec_error', 'trans_error', 'u_error', 'v_error']
     seen = []
-    for plt_idx in range(4):
+    for plt_idx in range(3):
         test_df = df.loc[df['test_name'] == test_names[plt_idx]]
         ascending = False if plt_idx == 3 else True
         group_df = test_df.groupby([
@@ -321,8 +347,6 @@ def plot_uv_ratio(df, result_dir, skip):
             name='Mean over 100 runs',
             showlegend=False
         ), row=rows[plt_idx], col=cols[plt_idx])
-
-    fig.update_yaxes(title_text='Error (MSE)', col=1)
     fig.update_xaxes(
         title_text='Ratio of strength between U and V in the generation of the exam-score dataset', col=2)
     fig.update_xaxes(
@@ -351,13 +375,12 @@ def plot_uv_ratio(df, result_dir, skip):
 
 
 def plot_xy_ratio(df, result_dir, skip):
-    titles = ['a) Reconstruction', "b) Translation",
-              "c) Probing U",
-              "d) Probing V"]
+    titles = ['a) Reconstruction', "b) Multiple Imputation",
+              "c) MIG"]
     fig = make_subplots(
-        rows=1, cols=4,
+        rows=1, cols=3,
         subplot_titles=titles,
-        vertical_spacing=0.05, horizontal_spacing=0.03)
+        vertical_spacing=0.05, horizontal_spacing=0.04)
 
     df = df.loc[df['epoch'] > skip]
 
@@ -368,7 +391,7 @@ def plot_xy_ratio(df, result_dir, skip):
     cols = [1, 2, 3, 4]
     test_names = ['rec_error', 'trans_error', 'u_error', 'v_error']
     seen = []
-    for plt_idx in range(4):
+    for plt_idx in range(3):
         test_df = df.loc[df['test_name'] == test_names[plt_idx]]
         ascending = False if plt_idx == 3 else True
         group_df = test_df.groupby([
@@ -413,11 +436,10 @@ def plot_xy_ratio(df, result_dir, skip):
             showlegend=False
         ), row=rows[plt_idx], col=cols[plt_idx])
 
-    fig.update_yaxes(title_text='Error (MSE)', col=1)
     fig.update_xaxes(
-        title_text='Ratio of magnitude between the confounded and unconfounded components of the instance factor', col=2)
+        title_text='Strength of confounding effect (gamma)', col=2)
     fig.update_xaxes(
-        tickvals=[0., 0.1, 0.5, 0.9, 1.])
+        tickvals=[0, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1])
     fig.update_layout(
         width=2*BIG_FIG_SIZE,
         height=BIG_FIG_SIZE,

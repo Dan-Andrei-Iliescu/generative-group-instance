@@ -31,7 +31,8 @@ class Model(nn.Module):
             self.inst_enc = InstEncoder(x_dim, u_dim, v_dim, h_dim)
 
         # create decoder network
-        self.decoder = DecoderGiven(uv_ratio=uv_ratio, xy_ratio=xy_ratio)
+        self.decoder = DecoderGiven(
+            uv_ratio=uv_ratio, xy_ratio=xy_ratio, x_dim=x_dim)
 
         # create adversary network depending on which regularization to use
         if self.reg == "v_vs_n":
@@ -46,7 +47,7 @@ class Model(nn.Module):
             self.adv_params = self.adv_v.parameters()
         elif self.reg == "ours":
             self.adv_u = GroupEncoder(x_dim, u_dim, h_dim)
-            self.adv_v = InstEncoder(x_dim, u_dim, v_dim=1, h_dim=h_dim)
+            self.adv_v = InstEncoder(v_dim, u_dim, v_dim=1, h_dim=h_dim)
             self.adv = self.ours
             self.adv_func = nemeth_func
             self.adv_params = list(self.adv_u.parameters()) + \

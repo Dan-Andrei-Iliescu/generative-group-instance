@@ -112,10 +112,11 @@ class Decoder(nn.Module):
 # define the PyTorch module that parameterizes the
 # observation likelihood p(x|z)
 class DecoderGiven(nn.Module):
-    def __init__(self, uv_ratio, xy_ratio):
+    def __init__(self, uv_ratio, xy_ratio, x_dim):
         super().__init__()
         self.uv_ratio = uv_ratio
         self.xy_ratio = xy_ratio
+        self.x_dim = x_dim
 
     def forward(self, u, v):
         batch_size = u.shape[0]

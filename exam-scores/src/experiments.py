@@ -39,7 +39,7 @@ def exp(result_dir="results", exp_name=None, training=True):
         uv_ratio_vals = [0.01, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 0.99]
         uv_ratio_def = 0.5
 
-        xy_ratio_vals = [0., 0.1, 0.5, 0.9, 1.]
+        xy_ratio_vals = [0., 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1.]
         xy_ratio_def = 1.
 
         # Select relevant conditions based on the requested experiment
@@ -79,7 +79,7 @@ def exp(result_dir="results", exp_name=None, training=True):
         elif exp_name == "ours_vs_theirs":
             group_accs = [None, "mul", "med", "med"]
             inst_conds = [True, False, False, False]
-            regs = ["ours", None, None, "nemeth"]
+            regs = [None, None, None, "nemeth"]
 
             for seed in seed_vals:
                 conds = zip(group_accs, inst_conds, regs)

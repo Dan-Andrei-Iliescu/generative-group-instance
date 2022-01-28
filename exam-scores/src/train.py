@@ -15,7 +15,7 @@ from src.latent_pred import LatentPred, LatentPredMulti
 def train(
         group_acc=None, inst_cond=True, reg=None,
         num_train_batches=1024, batch_size=64, num_test_batches=128,
-        num_epochs=4, test_freq=16, lr=1e-4, result_path="results",
+        num_epochs=64, test_freq=16, lr=1e-4, result_path="results",
         seed=2, uv_ratio=0.5, xy_ratio=1.):
 
     # Path to save test results
@@ -24,9 +24,13 @@ def train(
     result_name = os.path.join(result_path, model_name + f"_{seed}")
 
     # Setup datasets
+    u_dim = 2
+    v_dim = 2
+    x_dim = 2
     train_data, test_a, test_b, test_ab = generate_dataset(
         num_train_batches=num_train_batches, num_test_batches=num_test_batches,
-        batch_size=batch_size, seed=seed, uv_ratio=uv_ratio, xy_ratio=xy_ratio)
+        batch_size=batch_size, seed=seed, uv_ratio=uv_ratio, xy_ratio=xy_ratio,
+        u_dim=u_dim, v_dim=v_dim, x_dim=x_dim)
 
     train_x = train_data[0]
     train_u = train_data[1]
@@ -48,9 +52,9 @@ def train(
     # Setup the models
     model = Model(
         group_acc=group_acc, inst_cond=inst_cond, reg=reg, uv_ratio=uv_ratio,
-        xy_ratio=xy_ratio, lr=lr)
-    u_net = LatentPred(lr=lr, z_dim=2)
-    v_net = LatentPredMulti(lr=lr, v_dim=2, u_dim=2, h_dim=32)
+        xy_ratio=xy_ratio, lr=lr, u_dim=u_dim, v_dim=v_dim, x_dim=x_dim)
+    u_net = LatentPred(lr=lr, z_dim=u_dim)
+    v_net = LatentPredMulti(lr=lr, v_dim=v_dim, u_dim=u_dim, h_dim=32)
 
     # training loop
     dfs = []
@@ -81,6 +85,9 @@ def train(
         u_pred, v_pred = latent_test(model, u_net, v_net, test_a_x)
         u_error = rec_error(u_pred, test_a_u)
         v_error = rec_error(v_pred, test_a_u)
+
+        # NEW ERROR
+        u_error = v_error - u_error
 
         # Current time
         elapsed, mins, secs = elapsed_time(start_time)
