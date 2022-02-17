@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "exam-scores"
+name = "generative-group-instance"
 version = "0.1.0"
 description = ""
 authors = ["Dan-Andrei-Iliescu <iliescudanandrei@gmail.com>"]
@@ -11,9 +11,9 @@ numpy = "^1.21.2"
 tqdm = "^4.62.2"
 fire = "^0.4.0"
 torch = "^1.9.0"
-pyro-ppl = "^1.7.0"
 joblib = "^1.0.1"
 pandas = "^1.3.3"
+torchvision = "^0.11.3"
 
 [tool.poetry.dev-dependencies]
 
