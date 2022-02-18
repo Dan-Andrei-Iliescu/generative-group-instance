@@ -14,17 +14,20 @@ def int_to_binary(x, bits):
     x = torch.cat([x, y], dim=-1)
     return x
 
-
 def bin_pos_emb(x):
     num_bits = x.shape[3]
+    
     rows = int_to_binary(torch.arange(x.shape[1]), num_bits)
     rows = rows.unsqueeze(1).unsqueeze(0).unsqueeze(-1)
     rows = rows.expand(x.shape[0], -1, x.shape[2], -1, -1)
-
+    
     cols = int_to_binary(torch.arange(x.shape[2]), num_bits)
     cols = cols.unsqueeze(0).unsqueeze(0).unsqueeze(-1)
     cols = cols.expand(x.shape[0], x.shape[1], -1, -1, -1)
 
+    if x.is_cuda:
+        rows = rows.cuda(x.get_device())
+        cols = cols.cuda(x.get_device())
     return torch.cat([x, rows, cols], axis=-1)
 
 
