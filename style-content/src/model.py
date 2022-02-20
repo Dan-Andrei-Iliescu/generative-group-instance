@@ -3,27 +3,27 @@ import torch.nn as nn
 from torch.distributions import Normal, OneHotCategorical, RelaxedOneHotCategorical
 
 from src.networks import InstEncoder, GroupEncoder
-from src.networks import DecoderParallel as Decoder
-from utils.helpers import bin_pos_emb
+from src.networks import Decoder
+from utils.helpers import bin_pos_emb, trig_pos_emb
 
 
 class Model(nn.Module):
     def __init__(
-            self, x_dim=3, u_dim=16, v_dim=5, r_dim=2, num_bits=1, lr=1e-0):
+            self, x_dim=3, u_dim=4, v_dim=3, num_bits=32, lr=1e-2):
         super().__init__()
         # The image is batch_size x height x width x scales x features
         # Parameters
         self.x_dim = x_dim
         self.u_dim = u_dim
         self.v_dim = v_dim
-        self.r_dim = r_dim
         self.num_bits = num_bits
-        self.temperature = torch.Tensor([100])
 
         # Networks
-        self.group_enc = GroupEncoder(in_dim=x_dim+r_dim, out_dim=u_dim)
-        self.inst_enc = InstEncoder(in_dim=x_dim+r_dim+u_dim, out_dim=v_dim)
-        self.decoder = Decoder(in_dim=u_dim+v_dim+r_dim, out_dim=x_dim)
+        self.group_enc = GroupEncoder(
+            in_dim=x_dim+4*num_bits, out_dim=v_dim*u_dim)
+        self.inst_enc = InstEncoder(
+            in_dim=x_dim+u_dim+4*num_bits, out_dim=v_dim)
+        self.decoder = Decoder(in_dim=u_dim+v_dim+4*num_bits, out_dim=x_dim)
 
         # setup the optimizer
         self.model_params = list(self.group_enc.parameters()) + \
@@ -38,20 +38,16 @@ class Model(nn.Module):
 
     # define the variational posterior q(u|{x}) \prod_i q(v_i|x_i,u)
     def inference(self, x):
-        # Create new dimension for scales and concatenate positional embedding
-        x = x.unsqueeze(3)
-        x = x.expand(-1, -1, -1, self.num_bits, -1)
-        x = bin_pos_emb(x)
+        v = torch.zeros_like(x)
+
+        # Concatenate positional embedding
+        x = trig_pos_emb(x, self.num_bits)
 
         # Sample q(u|{x})
-        u_loc, u_scale = self.group_enc.forward(x)
-        qu = Normal(u_loc, u_scale)
-        u = qu.rsample()
+        u = self.group_enc.forward(x)
 
         # Sample q(v|x,u)
         v = self.inst_enc.forward(x, u)
-        qv = RelaxedOneHotCategorical(self.temperature, logits=v)
-        # v = qv.rsample()
 
         # Turn vector of weights into one hot using hard max
         _, idcs = v.max(dim=-1)
@@ -62,11 +58,11 @@ class Model(nn.Module):
         # Straight-Through trick
         v_hard = (v_hard - v).detach() + v
 
-        return qu, qv, u, v
+        return u, v_hard, v
 
     def generate(self, u, v):
-        # Create new dimension for scales and concatenate positional embedding
-        v = bin_pos_emb(v)
+        # Concatenate positional embedding
+        v = trig_pos_emb(v, self.num_bits)
 
         # Generative data dist
         x_loc = self.decoder.forward(u, v)
@@ -76,35 +72,31 @@ class Model(nn.Module):
     # ELBO loss for hierarchical variational autoencoder
     def elbo_func(self, x):
         # Latent inference
-        qu, qv, u, v = self.inference(x)
-        u = torch.zeros_like(u)
-
-        # Latent prior
-        pu, _ = self.prior(u, v)
+        u, v_hard, v = self.inference(x)
 
         # Generative data dist
-        x_loc = self.generate(u, v)
+        x_loc = self.generate(u, v_hard)
 
         # Losses
-        kl_u = torch.mean(qu.log_prob(u) - pu.log_prob(u))
-        kl_v = 0
+        kl_u = torch.mean(u**2)
+        kl_v = torch.mean(v**2)
         lik = torch.mean(torch.abs(x - x_loc))
-        return lik
+        return lik + kl_v + kl_u
 
     # define a helper function for reconstructing images
     def reconstruct(self, x):
         # sample q(u,{v}|{x})
-        _, _, u, v = self.inference(x)
+        u, v, _ = self.inference(x)
         # decode p({x}|u,{v})
         x_loc = self.generate(u, v)
-        return x_loc
+        return x_loc, v
 
     # define a helper function for translating images
     def translate(self, x, y):
         # sample q(u,{v}|{x})
-        _, _, _, v = self.inference(x)
+        _, v, _ = self.inference(x)
         # sample q(uy|{y})
-        _, _, u, _ = self.inference(y)
+        u, _, _ = self.inference(y)
         # decode p({x}|uy,{v})
         trans = self.generate(u, v)
         return trans

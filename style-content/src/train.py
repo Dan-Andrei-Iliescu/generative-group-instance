@@ -7,7 +7,7 @@ import numpy as np
 from torchvision.io import read_image, write_png, ImageReadMode
 
 from src.model import Model
-from utils.helpers import elapsed_time
+from utils.helpers import elapsed_time, pack_img, unpack_img
 
 
 def train(num_epochs=100):
@@ -18,9 +18,7 @@ def train(num_epochs=100):
         if filename.endswith((".jpeg", ".png", ".jpg")):
             img = read_image(os.path.join(data_dir, filename),
                              mode=ImageReadMode.RGB)
-            img = img.to(device)
-            img = img / 127.5 - 1.
-            img = img.movedim(0, 2).unsqueeze(0)
+            img = pack_img(img, device)
             imgs.append(img)
 
     # setup the model
@@ -30,9 +28,32 @@ def train(num_epochs=100):
     start_time = time.time()
     for epoch in range(num_epochs):
         epoch_loss = 0.
+        idx = 0
         for x in imgs:
             # do ELBO gradient and accumulate loss
             epoch_loss += model.step(x)
+
+            x_, v_ = model.reconstruct(x)
+            x_ = unpack_img(x_.detach())
+            result_path = os.path.join(
+                "results", "normal", f"img_{epoch}_{idx}.png")
+            write_png(x_, result_path)
+
+            """
+            v_ = unpack_img(v_.detach())
+            result_path = os.path.join(
+                "results", "normal", f"latent_{epoch}_{idx}.png")
+            write_png(v_, result_path)
+            """
+
+            if idx == 0:
+                y = x
+            xy = model.translate(x, y)
+            xy = unpack_img(xy.detach())
+            result_path = os.path.join(
+                "results", "normal", f"trans_{epoch}_{idx}.png")
+            write_png(xy, result_path)
+            idx += 1
         epoch_loss /= len(imgs)
 
         # Current time
@@ -40,15 +61,6 @@ def train(num_epochs=100):
         per_epoch = elapsed / (epoch + 1)
         print("> Training epochs [%d/%d] took %dm%ds, %.1fs/epoch" % (epoch, num_epochs, mins, secs, per_epoch)
               + "\nEpoch loss: %.4f" % (epoch_loss))
-
-        x = imgs[epoch % len(imgs)]
-        x_ = model.reconstruct(x)[0].detach().movedim(2, 0)
-        x_ = x_ - torch.min(x_)
-        x_ = x_ / torch.max(x_)
-        x_ = x_ * 255.
-        x_ = x_.to('cpu', dtype=torch.uint8)
-        result_path = os.path.join("results", "normal", f"img_{epoch}.png")
-        write_png(x_, result_path)
 
 
 if __name__ == '__main__':
