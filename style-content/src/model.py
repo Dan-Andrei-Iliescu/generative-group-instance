@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch.distributions import Normal, OneHotCategorical, RelaxedOneHotCategorical
 
 from src.networks import InstEncoder, GroupEncoder
 from src.networks import Decoder
@@ -9,45 +8,39 @@ from utils.helpers import bin_pos_emb, trig_pos_emb
 
 class Model(nn.Module):
     def __init__(
-            self, x_dim=3, u_dim=4, v_dim=3, num_bits=32, lr=1e-2):
+            self, x_dim=3, r_dim=4, u_dim=4, v_dim=4, h_dim=4, lr=1e-2):
         super().__init__()
         # The image is batch_size x height x width x scales x features
         # Parameters
         self.x_dim = x_dim
+        self.r_dim = r_dim
         self.u_dim = u_dim
         self.v_dim = v_dim
-        self.num_bits = num_bits
+        self.h_dim = h_dim
+        args = (self.x_dim, self.r_dim, self.u_dim, self.v_dim, self.h_dim)
 
         # Networks
-        self.group_enc = GroupEncoder(
-            in_dim=x_dim+4*num_bits, out_dim=v_dim*u_dim)
-        self.inst_enc = InstEncoder(
-            in_dim=x_dim+u_dim+4*num_bits, out_dim=v_dim)
-        self.decoder = Decoder(in_dim=u_dim+v_dim+4*num_bits, out_dim=x_dim)
+        self.group_enc = GroupEncoder(*args)
+        self.inst_enc = InstEncoder(*args)
+        self.decoder = Decoder(*args)
 
-        # setup the optimizer
+        # Optimizer
         self.model_params = list(self.group_enc.parameters()) + \
             list(self.inst_enc.parameters()) + \
             list(self.decoder.parameters())
-        self.optimizer = torch.optim.Adam(self.model_params, lr=lr)
-
-    def prior(self, u, v):
-        pu = Normal(torch.zeros_like(u), torch.ones_like(u))
-        pv = OneHotCategorical(logits=torch.ones_like(v))
-        return pu, pv
+        self.optimizer = torch.optim.Adam(
+            self.model_params, lr=lr)
 
     # define the variational posterior q(u|{x}) \prod_i q(v_i|x_i,u)
     def inference(self, x):
-        v = torch.zeros_like(x)
-
-        # Concatenate positional embedding
-        x = trig_pos_emb(x, self.num_bits)
+        # Positional embedding
+        r = bin_pos_emb(x, self.r_dim)
 
         # Sample q(u|{x})
-        u = self.group_enc.forward(x)
+        u = self.group_enc.forward(x, r)
 
         # Sample q(v|x,u)
-        v = self.inst_enc.forward(x, u)
+        v = self.inst_enc.forward(x, r, u)
 
         # Turn vector of weights into one hot using hard max
         _, idcs = v.max(dim=-1)
@@ -62,10 +55,10 @@ class Model(nn.Module):
 
     def generate(self, u, v):
         # Concatenate positional embedding
-        v = trig_pos_emb(v, self.num_bits)
+        r = bin_pos_emb(v, self.r_dim)
 
         # Generative data dist
-        x_loc = self.decoder.forward(u, v)
+        x_loc = self.decoder.forward(r, u, v)
 
         return x_loc
 
@@ -81,7 +74,7 @@ class Model(nn.Module):
         kl_u = torch.mean(u**2)
         kl_v = torch.mean(v**2)
         lik = torch.mean(torch.abs(x - x_loc))
-        return lik + kl_v + kl_u
+        return lik + kl_u + kl_v
 
     # define a helper function for reconstructing images
     def reconstruct(self, x):
@@ -109,11 +102,3 @@ class Model(nn.Module):
         self.optimizer.step()
         self.optimizer.zero_grad()
         return loss
-
-
-if __name__ == '__main__':
-    model = Model()
-
-    x = torch.rand(size=[16, 128, 64, 5])
-    pos = model.pos_encoding(x, 7)
-    print(pos)

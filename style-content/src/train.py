@@ -2,12 +2,12 @@ import fire
 import os
 import time
 import torch
+
 import numpy as np
 
-from torchvision.io import read_image, write_png, ImageReadMode
-
 from src.model import Model
-from utils.helpers import elapsed_time, pack_img, unpack_img
+from utils.helpers import pack_img, unpack_img, read_img, write_img
+from utils.helpers import elapsed_time
 
 
 def train(num_epochs=100):
@@ -16,8 +16,7 @@ def train(num_epochs=100):
     imgs = []
     for filename in os.listdir(data_dir):
         if filename.endswith((".jpeg", ".png", ".jpg")):
-            img = read_image(os.path.join(data_dir, filename),
-                             mode=ImageReadMode.RGB)
+            img = read_img(os.path.join(data_dir, filename))
             img = pack_img(img, device)
             imgs.append(img)
 
@@ -32,29 +31,33 @@ def train(num_epochs=100):
         for x in imgs:
             # do ELBO gradient and accumulate loss
             epoch_loss += model.step(x)
-
-            x_, v_ = model.reconstruct(x)
-            x_ = unpack_img(x_.detach())
-            result_path = os.path.join(
-                "results", "normal", f"img_{epoch}_{idx}.png")
-            write_png(x_, result_path)
-
-            """
-            v_ = unpack_img(v_.detach())
-            result_path = os.path.join(
-                "results", "normal", f"latent_{epoch}_{idx}.png")
-            write_png(v_, result_path)
-            """
-
-            if idx == 0:
-                y = x
-            xy = model.translate(x, y)
-            xy = unpack_img(xy.detach())
-            result_path = os.path.join(
-                "results", "normal", f"trans_{epoch}_{idx}.png")
-            write_png(xy, result_path)
-            idx += 1
         epoch_loss /= len(imgs)
+
+        # Random images to plot
+        x = imgs[np.random.randint(0, len(imgs))]
+        y = imgs[np.random.randint(0, len(imgs))]
+
+        x_, v_ = model.reconstruct(x)
+        x_ = unpack_img(x_.detach())
+        result_path = os.path.join(
+            "results", "normal", f"img_{epoch}.png")
+        write_img(x_, result_path)
+
+        m = torch.randn(3, v_.shape[-1])
+        v_ = torch.einsum('xv,nijv->nijx', m, v_)
+        v_ = unpack_img(v_.detach())
+        result_path = os.path.join(
+            "results", "normal", f"latent_{epoch}.png")
+        write_img(v_, result_path)
+
+        if idx == 0:
+            y = x
+        xy = model.translate(x, y)
+        xy = unpack_img(xy.detach())
+        result_path = os.path.join(
+            "results", "normal", f"trans_{epoch}.png")
+        write_img(xy, result_path)
+        idx += 1
 
         # Current time
         elapsed, mins, secs = elapsed_time(start_time)
