@@ -8,7 +8,7 @@ from utils.helpers import bin_pos_emb, trig_pos_emb
 
 class Model(nn.Module):
     def __init__(
-            self, x_dim=3, r_dim=4, u_dim=4, v_dim=4, h_dim=4, lr=1e-2):
+            self, x_dim=3, r_dim=16, u_dim=8, v_dim=6, h_dim=16, lr=1e-2):
         super().__init__()
         # The image is batch_size x height x width x scales x features
         # Parameters
