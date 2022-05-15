@@ -136,8 +136,8 @@ def plot_data(x, result_path):
 
 
 def plot_trans(x, y, trans, result_path):
-    num_rows = 3
-    num_cols = 1
+    num_rows = 1
+    num_cols = 3
     fig = make_subplots(
         rows=num_rows, cols=num_cols,
         vertical_spacing=0.04, horizontal_spacing=0.01)
@@ -149,7 +149,7 @@ def plot_trans(x, y, trans, result_path):
             group_idx = num_cols * row + col + 0
             fig.add_trace(go.Violin(
                 x=x[group_idx][:, 0], y=[0 for _ in x[group_idx][:, 0]],
-                name="A", orientation='h', side='negative',
+                name="Student A", orientation='h', side='negative',
                 legendgroup="0", showlegend=ok1, scalegroup=group_idx,
                 marker_color=colour_assign("4")), row=row+1, col=col+1)
             ok1 = False
@@ -175,7 +175,7 @@ def plot_trans(x, y, trans, result_path):
                 row=row+1, col=col+1)
             fig.add_trace(go.Violin(
                 x=y[group_idx][:, 0], y=[1 for _ in y[group_idx][:, 0]],
-                name="B", orientation='h', side='negative',
+                name="Student B", orientation='h', side='negative',
                 legendgroup="1", showlegend=ok3, scalegroup=group_idx,
                 marker_color=colour_assign("1")),
                 row=row+1, col=col+1)
@@ -183,15 +183,15 @@ def plot_trans(x, y, trans, result_path):
     fig.update_xaxes(row=3)
     fig.update_yaxes(showticklabels=False)
     fig.update_layout(
-        width=int(BIG_FIG_SIZE/2),
-        height=BIG_FIG_SIZE,
+        width=2*BIG_FIG_SIZE,
+        height=int(BIG_FIG_SIZE/2),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
     fig.update_layout(legend=dict(
         orientation="h",
         yanchor="top",
-        y=1.05,
+        y=1.1,
         xanchor="left",
         x=0
     ))

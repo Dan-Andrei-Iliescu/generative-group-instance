@@ -36,7 +36,7 @@ def generator(u, v, x_dim, uv_ratio, xy_ratio):
 
 
 def generate_dataset(
-        num_train_batches=64, num_test_batches=8, batch_size=32, seed=2,
+        num_train_batches=1024, num_test_batches=128, batch_size=64, seed=2,
         uv_ratio=0.5, xy_ratio=1., u_dim=2, v_dim=2, x_dim=2):
 
     # Random number generator for this run
