@@ -8,7 +8,7 @@ import pandas as pd
 
 NUM_GROUPS_PER_PLOT = 5
 FIG_SIZE = 400
-BIG_FIG_SIZE = 600
+BIG_FIG_SIZE = 400
 
 
 def colour_assign(model_name):
@@ -16,15 +16,16 @@ def colour_assign(model_name):
         'Other regularization': '#5C7065',
         'Other instance conditioning': '#79B473',
         'Other group encoder': '#433E0E',
-        'CxVAE': '#D36135',
-        'Other SOTA': '#41658A',
-        'def': '#4C3957',
-        '0': '#5C7065',
-        '1': '#79B473',
-        '2': '#433E0E',
-        '3': '#D36135',
-        '4': '#41658A',
-        '5': '#4C3957'
+        'CxVAE': '#FB5607',
+        'Other SOTA': '#C0DA16',
+        'def': '#000000',
+        '0': '#FB5607',
+        '1': '#C0DA16',
+        '2': '#9B52DE',
+        '3': '#FFBE0B',
+        '4': '#FF006E',
+        '5': '#3A86FF',
+        '6': '#6BD08B'
     }
     if model_name in colour_dict.keys():
         return colour_dict[model_name]
@@ -58,9 +59,9 @@ def name_assign(model_name):
         'False_ours_None': 'C',
         'True_ours_mul': 'D',
         'True_ours_med': 'E',
-        'False_None_mul': 'ML-VAE',
+        'False_None_mul': 'AdaGVAE',
         'False_None_med': 'GVAE',
-        'False_nemeth_med': 'GVAE-AD',
+        'False_nemeth_med': 'COCO-FUNIT',
         'True': 'CxVAE',
         'False': 'GVAE'
     }
@@ -69,140 +70,121 @@ def name_assign(model_name):
     return model_name
 
 
-def plot_data(x, result_path):
-    fig = go.Figure()
-    idx = 0
-    loc = 0.5
-    is_show = True
-    for x_group in x[:NUM_GROUPS_PER_PLOT]:
-        idcs = [idx for _ in x_group]
-        mu = np.mean(x_group[:, 0])
-        if idx < 4:
-            fig.add_hline(y=idx+0.5, line_color="lightgray", line_dash="dash")
-        fig.add_trace(go.Scatter(
-            x=x_group[:, 0], y=idcs, name="Scores",
-            legendgroup="0", showlegend=is_show, mode="markers",
-            marker_line_color=colour_assign(str(4)),
-            marker_symbol="line-ns", marker_line_width=2))
-        fig.add_trace(go.Violin(
-            x=x_group[:, 0], name="Distribution for student i",
-            side='positive', points=False,
-            legendgroup="1", showlegend=is_show,
-            marker_color=colour_assign(str(4))))
-        fake = (mu + loc) / 2
-        fig.add_trace(go.Scatter(
-            x=[fake], y=[idx-0.3], name=f"Test difficulty for student i if score={loc}",
-            legendgroup="2", showlegend=is_show, mode="markers",
-            marker_size=10,
-            marker_color=colour_assign(str(1))))
-        fig.add_shape(
-            type="rect", x0=mu, y0=idx-0.2, x1=loc, y1=idx-0.4,
-            line=dict(color=colour_assign(str(1))),
-            fillcolor=colour_assign(str(1)))
-        idx += 1
-        is_show = False
-
-    fig.add_vline(x=loc)
-    fig.update_xaxes(title_text="Test Scores")
-    fig.update_yaxes(title_text="Student i")
-    fig.update_layout(
-        width=BIG_FIG_SIZE,
-        height=FIG_SIZE,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-    )
-    fig.update_layout(legend=dict(
-        orientation="h",
-        yanchor="top",
-        y=1.1,
-        xanchor="left",
-        x=0
-    ))
-    fig.update_layout(
-        xaxis=dict(
-            tickmode='linear',
-            tick0=loc,
-            dtick=0.5
-        )
-    )
-    fig['layout'].update(margin=dict(l=0, r=0, b=0, t=1))
-    fig.update_xaxes(showline=True, linewidth=1, gridcolor='lightgrey',
-                     linecolor='black', mirror=True)
-    fig.update_yaxes(showline=True, linewidth=1,
-                     linecolor='black', mirror=True)
-    fig.write_image(result_path + ".pdf")
-    time.sleep(2)
-    fig.write_image(result_path + ".pdf")
+def shape_assign(x):
+    shapes = [
+        'x-thin-open', 'circle-open-dot', 'square-open-dot',
+        'triangle-up-open-dot', 'diamond-open-dot', 'cross-thin-open']
+    return shapes[x % len(shapes)]
 
 
-def plot_trans(x, y, trans, result_path):
+def plot_data(others, result_path):
     num_rows = 1
-    num_cols = 3
+    num_cols = 1
+    name = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
     fig = make_subplots(
         rows=num_rows, cols=num_cols,
         vertical_spacing=0.04, horizontal_spacing=0.01)
-    ok1 = True
-    ok2 = True
-    ok3 = True
     for row in range(num_rows):
         for col in range(num_cols):
             group_idx = num_cols * row + col + 0
-            fig.add_trace(go.Violin(
-                x=x[group_idx][:, 0], y=[0 for _ in x[group_idx][:, 0]],
-                name="Student A", orientation='h', side='negative',
-                legendgroup="0", showlegend=ok1, scalegroup=group_idx,
-                marker_color=colour_assign("4")), row=row+1, col=col+1)
-            ok1 = False
-            for (a, b) in zip(x[group_idx], trans[group_idx]):
+            for other, idx in zip(others, range(len(others))):
                 fig.add_trace(go.Scatter(
-                    x=[a[0], b[0]], y=[0, 0.5],
-                    legendgroup="2", showlegend=False, mode="lines+markers",
-                    marker_line_color="gray", line_color="gray"),
+                    x=other[group_idx][:, 0], y=other[group_idx][:, 1],
+                    legendgroup="1", showlegend=True, name="School "+name[idx],
+                    mode="markers",
+                    marker_color=colour_assign(str(idx)), marker_size=10,
+                    marker_symbol=shape_assign(idx+2)),
                     row=row+1, col=col+1)
-            fig.add_trace(go.Violin(
-                x=trans[group_idx][:, 0], y=[
-                    0.5 for _ in trans[group_idx][:, 0]],
-                name="Translation", orientation='h', side='positive',
-                legendgroup="2", showlegend=ok2, scalegroup=group_idx,
-                marker_color=colour_assign("3")),
-                row=row+1, col=col+1)
-            ok2 = False
-            fig.add_trace(go.Scatter(
-                x=y[group_idx][:, 0], y=[1 for _ in y[group_idx][:, 0]],
-                legendgroup="1", showlegend=False, mode="markers",
-                marker_line_color=colour_assign("1"),
-                marker_symbol="line-ns", marker_line_width=2),
-                row=row+1, col=col+1)
-            fig.add_trace(go.Violin(
-                x=y[group_idx][:, 0], y=[1 for _ in y[group_idx][:, 0]],
-                name="Student B", orientation='h', side='negative',
-                legendgroup="1", showlegend=ok3, scalegroup=group_idx,
-                marker_color=colour_assign("1")),
-                row=row+1, col=col+1)
-            ok3 = False
     fig.update_xaxes(row=3)
-    fig.update_yaxes(showticklabels=False)
     fig.update_layout(
-        width=2*BIG_FIG_SIZE,
-        height=int(BIG_FIG_SIZE/2),
+        width=BIG_FIG_SIZE,
+        height=int(BIG_FIG_SIZE),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
     fig.update_layout(legend=dict(
-        orientation="h",
+        orientation="v",
         yanchor="top",
-        y=1.1,
-        xanchor="left",
-        x=0
+        y=1,
+        xanchor="right",
+        x=1,
+        bordercolor="Black",
+        borderwidth=0.5
     ))
     fig['layout'].update(margin=dict(l=1, r=1, b=0, t=1))
-    fig.update_xaxes(showline=True, linewidth=1, gridcolor='lightgrey',
-                     linecolor='black', mirror=True)
-    fig.update_yaxes(showline=True, linewidth=1,
-                     linecolor='black', mirror=True)
-    fig.write_image(result_path + "_trans.pdf")
+    fig.update_xaxes(showline=True, linewidth=1, showticklabels=False,
+                     linecolor='black', mirror=True, title="Maths Test Score")
+    fig.update_yaxes(showline=True, linewidth=1, showticklabels=False,
+                     linecolor='black', mirror=True, title="Reading Test Score")
+    fig.write_image(result_path + "_data.pdf")
     time.sleep(2)
-    fig.write_image(result_path + "_trans.pdf")
+    fig.write_image(result_path + "_data.pdf")
+
+
+def plot_trans(x, trans, y, others, result_path, is_trans=True):
+    num_rows = 1
+    num_cols = 1
+    name = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+    fig = make_subplots(
+        rows=num_rows, cols=num_cols,
+        vertical_spacing=0.04, horizontal_spacing=0.01)
+    for row in range(num_rows):
+        for col in range(num_cols):
+            group_idx = num_cols * row + col + 0
+            fig.add_trace(go.Histogram2dContour(
+                x=y[group_idx][:, 0], y=y[group_idx][:, 1],
+                line_color='lightblue', colorscale=["white", "lightblue"],
+                showlegend=True, name='Typical School', showscale=False),
+                row=row+1, col=col+1)
+            if is_trans:
+                for a, b in zip(x[group_idx], trans[group_idx]):
+                    fig.add_trace(go.Scatter(
+                        x=[a[0], b[0]], y=[a[1], b[1]],
+                        legendgroup="2", showlegend=False, mode="lines",
+                        marker_line_color="gray", line_color="black",
+                        line_width=0.5), row=row+1, col=col+1)
+            for other, idx in zip(others, range(len(others))):
+                fig.add_trace(go.Scatter(
+                    x=other[group_idx][:, 0], y=other[group_idx][:, 1],
+                    legendgroup="1", showlegend=True, name="School "+name[idx],
+                    mode="markers",
+                    marker_color=colour_assign(str(idx)), marker_size=10,
+                    marker_symbol=shape_assign(idx+2)),
+                    row=row+1, col=col+1)
+            if is_trans:
+                fig.add_trace(go.Scatter(
+                    x=trans[group_idx][:, 0], y=trans[group_idx][:, 1],
+                    legendgroup="1", showlegend=True, name="A -> Typical",
+                    mode="markers", marker_color=colour_assign('def'),
+                    marker_size=10, marker_symbol=shape_assign(1)),
+                    row=row+1, col=col+1)
+    fig.update_xaxes(range=[-5, 5])
+    fig.update_yaxes(range=[-5, 5])
+    fig.update_coloraxes(showscale=False)
+    fig.update_layout(
+        width=BIG_FIG_SIZE,
+        height=BIG_FIG_SIZE,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
+    fig.update_layout(legend=dict(
+        orientation="v",
+        yanchor="top",
+        y=1,
+        xanchor="right",
+        x=1,
+        bordercolor="Black",
+        borderwidth=0.5
+    ))
+    fig['layout'].update(margin=dict(l=1, r=1, b=0, t=1))
+    fig.update_xaxes(showline=True, linewidth=1, showticklabels=False,
+                     linecolor='black', mirror=True, title="Maths Test Score")
+    fig.update_yaxes(showline=True, linewidth=1, showticklabels=False,
+                     linecolor='black', mirror=True, title="Reading Test Score")
+    name = "_trans.pdf" if is_trans else "_data.pdf"
+    fig.write_image(result_path + name)
+    time.sleep(2)
+    fig.write_image(result_path + name)
 
 
 def moving_avg(a, n):
@@ -213,12 +195,12 @@ def moving_avg(a, n):
 
 
 def plot_results(df, result_dir, skip):
-    titles = ['a) Reconstruction', "b) Multiple Imputation",
-              "c) MIG"]
+    titles = ['a) Reconstruction Error', "b) Translation Error",
+              "c) Mutual Information Gap"]
     fig = make_subplots(
         rows=1, cols=3,
         subplot_titles=titles,
-        vertical_spacing=0.05, horizontal_spacing=0.07)
+        vertical_spacing=0.05, horizontal_spacing=0.04)
 
     df = df.loc[df['epoch'] > skip]
     model_names = pd.unique(df['model_name'])
@@ -238,11 +220,9 @@ def plot_results(df, result_dir, skip):
         model_names = group_df['model_name']
         for model_name in model_names:
             model_df = test_df.loc[test_df['model_name'] == model_name]
-            fig.add_trace(go.Box(
+            fig.add_trace(go.Violin(
                 x=model_df['model_name'].apply(name_assign),
                 y=model_df['value'],
-                notched=False,
-                boxmean=True,
                 marker_color=colour_assign(group_assign(model_name)),
                 name=group_assign(model_name),
                 legendgroup=group_assign(model_name),
@@ -261,21 +241,23 @@ def plot_results(df, result_dir, skip):
         seen.append("green")
         """
 
-    fig.update_xaxes(title_text='Models', col=2)
+    # fig.update_xaxes(title_text='Models', col=2)
     fig.update_layout(
-        width=BIG_FIG_SIZE,
+        width=3*BIG_FIG_SIZE,
         height=BIG_FIG_SIZE,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
     fig.update_layout(legend=dict(
-        orientation="h",
-        yanchor="top",
-        y=1.2,
+        orientation="v",
+        yanchor="bottom",
+        y=0.1,
         xanchor="left",
-        x=0
+        x=0.01,
+        bordercolor="Black",
+        borderwidth=0.5
     ))
-    fig['layout'].update(margin=dict(l=0, r=0, b=0))
+    fig['layout'].update(margin=dict(l=0, r=0, b=0, t=30))
     fig.update_xaxes(showline=True, linewidth=1,
                      linecolor='black', mirror=True)
     fig.update_yaxes(showline=True, linewidth=1, gridcolor='lightgrey',
@@ -375,8 +357,8 @@ def plot_uv_ratio(df, result_dir, skip):
 
 
 def plot_xy_ratio(df, result_dir, skip):
-    titles = ['a) Reconstruction', "b) Multiple Imputation",
-              "c) MIG"]
+    titles = ['a) Reconstruction Error', "b) Translation Error",
+              "c) Mutual Information Gap"]
     fig = make_subplots(
         rows=1, cols=3,
         subplot_titles=titles,
@@ -437,23 +419,25 @@ def plot_xy_ratio(df, result_dir, skip):
         ), row=rows[plt_idx], col=cols[plt_idx])
 
     fig.update_xaxes(
-        title_text='Strength of confounding effect (gamma)', col=2)
+        title_text='Amount of conditional shift', col=2)
     fig.update_xaxes(
         tickvals=[0, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 1])
     fig.update_layout(
-        width=2*BIG_FIG_SIZE,
+        width=3*BIG_FIG_SIZE,
         height=BIG_FIG_SIZE,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
     fig.update_layout(legend=dict(
-        orientation="h",
-        yanchor="top",
-        y=1.12,
+        orientation="v",
+        yanchor="bottom",
+        y=0.1,
         xanchor="left",
-        x=0
+        x=0.01,
+        bordercolor="Black",
+        borderwidth=0.5
     ))
-    fig['layout'].update(margin=dict(l=0, r=0, b=0, t=1))
+    fig['layout'].update(margin=dict(l=0, r=0, b=0, t=30))
     fig.update_xaxes(showline=True, linewidth=1, gridcolor='lightgrey',
                      linecolor='black', mirror=True)
     fig.update_yaxes(showline=True, linewidth=1, gridcolor='lightgrey',

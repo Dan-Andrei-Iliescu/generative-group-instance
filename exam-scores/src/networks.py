@@ -23,7 +23,7 @@ class Encoder(nn.Module):
         hidden = self.relu(self.fc2(hidden))
         hidden = self.relu(self.fc3(hidden))
         v_loc = self.fc41(hidden)
-        v_scale = self.softplus(self.fc42(hidden))
+        v_scale = self.softplus(self.fc42(hidden)) + 1e-8
         return v_loc, v_scale
 
 
@@ -52,7 +52,7 @@ class GroupEncoder(nn.Module):
         # each of size batch_size x z_dim
         hidden = self.relu(self.fc3(hidden))
         u_loc = self.fc41(hidden)
-        u_scale = self.softplus(self.fc42(hidden))
+        u_scale = self.softplus(self.fc42(hidden)) + 1e-8
         return u_loc, u_scale
 
 
@@ -82,16 +82,16 @@ class InstEncoder(nn.Module):
         # each of size batch_size x z_dim
         hidden = self.relu(self.fc3(hidden))
         v_loc = self.fc41(hidden)
-        v_scale = self.softplus(self.fc42(hidden))
+        v_scale = self.softplus(self.fc42(hidden)) + 1e-8
         return v_loc, v_scale
 
 
 # define the PyTorch module that parameterizes the
 # observation likelihood p(x|z)
 class Decoder(nn.Module):
-    def __init__(self, x_dim, u_dim, v_dim, h_dim):
+    def __init__(self, x_dim, h_dim):
         super().__init__()
-        self.fc1 = nn.Linear(u_dim+v_dim, h_dim)
+        self.fc1 = nn.Linear(3*x_dim, h_dim)
         self.fc2 = nn.Linear(h_dim, h_dim)
         self.fc3 = nn.Linear(h_dim, h_dim)
         self.fc4 = nn.Linear(h_dim, x_dim)
@@ -112,18 +112,20 @@ class Decoder(nn.Module):
 # define the PyTorch module that parameterizes the
 # observation likelihood p(x|z)
 class DecoderGiven(nn.Module):
-    def __init__(self, uv_ratio, xy_ratio, x_dim):
+    def __init__(self, xy_ratio, x_dim):
         super().__init__()
-        self.uv_ratio = uv_ratio
         self.xy_ratio = xy_ratio
         self.x_dim = x_dim
 
     def forward(self, u, v):
+        mult = 1
         batch_size = u.shape[0]
         u = torch.broadcast_to(u, [batch_size, v.shape[1], u.shape[2]])
         x = torch.zeros_like(v)
-        x[:, :, 0] = u[:, :, 0] + v[:, :, 0]
-        x[:, :, 1] = v[:, :, 1]
+        x[:, :, 0] = self.xy_ratio * mult * u[:, :, 0] + \
+            (u[:, :, 1] / 3 + 1)**self.xy_ratio * v[:, :, 0]
+        x[:, :, 1] = mult * u[:, :, 2] + self.xy_ratio * \
+            (u[:, :, 3] / 3 + 1) * v[:, :, 1]
         return x
 
 

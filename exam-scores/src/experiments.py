@@ -34,7 +34,7 @@ def exp(result_dir="results", exp_name=None, training=True):
 
         seed_vals = [2, 8, 32, 128, 512]
         seed_vals = [2, 32, 512]
-        # seed_vals = [128]
+        seed_vals = [3]
 
         uv_ratio_vals = [0.01, 0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 0.9, 0.99]
         uv_ratio_def = 0.5
@@ -171,12 +171,10 @@ def exp(result_dir="results", exp_name=None, training=True):
         # Run in parallel training for all conditions
         start_time = time.time()
         Parallel(n_jobs=-1)(delayed(train)(
-            num_epochs=num_epochs,
-            group_acc=dict['group_acc'], inst_cond=dict['inst_cond'],
-            reg=dict['reg'], num_train_batches=dict['num_train_batches'],
+            num_epochs=num_epochs, inst_cond=dict['inst_cond'],
+            num_train_batches=dict['num_train_batches'],
             batch_size=dict['batch_size'], lr=0.1**dict['lr'],
-            seed=dict['seed'], uv_ratio=dict['uv_ratio'],
-            xy_ratio=dict['xy_ratio'], result_path=exp_dir
+            seed=dict['seed'], xy_ratio=dict['xy_ratio'], result_path=exp_dir
         ) for dict in cond_dicts)
         _, mins, secs = elapsed_time(start_time)
         print("\nExperiment %s took %dm%ds to train\n\n" %

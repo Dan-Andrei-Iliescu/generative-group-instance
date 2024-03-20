@@ -13,24 +13,20 @@ from src.latent_pred import LatentPred, LatentPredMulti
 
 
 def train(
-        group_acc=None, inst_cond=True, reg=None,
-        num_train_batches=1024, batch_size=64, num_test_batches=128,
-        num_epochs=64, test_freq=16, lr=1e-4, result_path="results",
-        seed=2, uv_ratio=0.5, xy_ratio=1.):
+        inst_cond=False, num_train_batches=1024, batch_size=64,
+        num_test_batches=128, num_epochs=64, test_freq=2, lr=1e-4,
+        result_path="results", seed=3, xy_ratio=1.):
 
     # Path to save test results
     result_csv = os.path.join(result_path, "results.csv")
-    model_name = f"{inst_cond}_{reg}_{group_acc}"
+    model_name = f"{inst_cond}"
     result_name = os.path.join(result_path, model_name + f"_{seed}")
 
     # Setup datasets
-    u_dim = 2
-    v_dim = 2
     x_dim = 2
     train_data, test_a, test_b, test_ab = generate_dataset(
         num_train_batches=num_train_batches, num_test_batches=num_test_batches,
-        batch_size=batch_size, seed=seed, uv_ratio=uv_ratio, xy_ratio=xy_ratio,
-        u_dim=u_dim, v_dim=v_dim, x_dim=x_dim)
+        batch_size=batch_size, seed=seed, xy_ratio=xy_ratio, x_dim=x_dim)
 
     train_x = train_data[0]
     train_u = train_data[1]
@@ -51,10 +47,9 @@ def train(
 
     # Setup the models
     model = Model(
-        group_acc=group_acc, inst_cond=inst_cond, reg=reg, uv_ratio=uv_ratio,
-        xy_ratio=xy_ratio, lr=lr, u_dim=u_dim, v_dim=v_dim, x_dim=x_dim)
-    u_net = LatentPred(lr=lr, z_dim=u_dim)
-    v_net = LatentPredMulti(lr=lr, v_dim=v_dim, u_dim=u_dim, h_dim=32)
+        inst_cond=inst_cond, xy_ratio=xy_ratio, lr=lr, x_dim=x_dim)
+    u_net = LatentPred(lr=lr, z_dim=2*x_dim)
+    v_net = LatentPredMulti(lr=lr, v_dim=x_dim, u_dim=2*x_dim, h_dim=32)
 
     # training loop
     dfs = []
@@ -78,8 +73,10 @@ def train(
         trans_err = rec_error(test_ab_x, trans_res)
 
         # Plot
+        others = [test_a[0][0], test_a[0][1], test_a[0][2]]
         if (epoch+1) % test_freq == 0:
-            plot_trans(test_a_x[0], test_b_x[0], trans_res[0], result_name)
+            plot_trans(test_a_x[0], trans_res[0],
+                       test_b_x[0], others, result_name)
 
         # Test the accuracy of predicting the true latents from the inferred ones
         u_pred, v_pred = latent_test(model, u_net, v_net, test_a_x)
@@ -106,9 +103,6 @@ def train(
             'test_name': ['rec_error', 'trans_error', 'u_error', 'v_error'],
             'model_name': [model_name, model_name, model_name, model_name],
             'inst_cond': [inst_cond, inst_cond, inst_cond, inst_cond],
-            'reg': [reg, reg, reg, reg],
-            'group_acc': [group_acc, group_acc, group_acc, group_acc],
-            'uv_ratio': [uv_ratio, uv_ratio, uv_ratio, uv_ratio],
             'xy_ratio': [xy_ratio, xy_ratio, xy_ratio, xy_ratio],
             'seed': [seed, seed, seed, seed],
             'epoch': [epoch, epoch, epoch, epoch],
@@ -117,8 +111,7 @@ def train(
 
     # Save dataframe of results
     test_df = pd.DataFrame(columns=['test_name', 'model_name', 'inst_cond',
-                                    'reg', 'group_acc', 'uv_ratio', 'xy_ratio',
-                                    'seed', 'epoch', 'value'])
+                                    'xy_ratio', 'seed', 'epoch', 'value'])
     for df in dfs:
         test_df = pd.concat([test_df, df])
     if os.path.exists(result_csv):
